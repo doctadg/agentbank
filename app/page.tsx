@@ -439,7 +439,7 @@ export default function Home() {
             <a href="#how" className="hover:text-[#171717] transition-colors">How it works</a>
             <a href="#fees" className="hover:text-[#171717] transition-colors">Fees</a>
             <a href="/copytrade" className="hover:text-[#171717] transition-colors">Live</a>
-            <a href="https://x.com/agentbank" target="_blank" rel="noreferrer" aria-label="X (@agentbank)" className="w-8 h-8 rounded-full flex items-center justify-center text-[#888] hover:text-[#171717] hover:bg-black/[0.04] transition-all">
+            <a href="https://x.com/agentbankx" target="_blank" rel="noreferrer" aria-label="X (@agentbankx)" className="w-8 h-8 rounded-full flex items-center justify-center text-[#888] hover:text-[#171717] hover:bg-black/[0.04] transition-all">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
             </a>
           </div>
