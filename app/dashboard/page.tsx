@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   useCopytrade,
@@ -9,7 +8,7 @@ import {
   hyperliquidExplorer,
   type TraderStats,
 } from "../hooks/useHyperliquid";
-import { useVaultStats, useDistributions, useLeaderboard } from "../hooks/useApi";
+import { useVaultStats, useLeaderboard } from "../hooks/useApi";
 
 const FOLLOWED = [
   "0x8def9f50456c6c4e37fa5d3d57f108ed23992dae",
@@ -47,12 +46,7 @@ function fmtRelative(ts: string | null | undefined): string {
   return `${days}d ago`;
 }
 
-function fmtDate(ts: string) {
-  const d = new Date(ts);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-// ─── Live pulse dot ────────────────────────────────────
+// ─── Live pulse ────────────────────────────────────────
 function LivePulse({ color = "#00ff88", size = 6 }: { color?: string; size?: number }) {
   return (
     <span className="relative inline-flex" style={{ width: size, height: size }}>
@@ -101,19 +95,9 @@ function TraderSummary({ stats }: { stats: TraderStats }) {
 export default function Dashboard() {
   const { stats: traderStats, totals } = useCopytrade(FOLLOWED);
   const { stats: vault, error: vaultError } = useVaultStats();
-  const { distributions } = useDistributions();
   const { leaderboard } = useLeaderboard();
 
   const profitable = totals.pnl24h >= 0;
-
-  // 7d distribution sum
-  const last7dDistributions = useMemo(() => {
-    const cutoff = Date.now() - 7 * 86400_000;
-    return distributions
-      .filter((d) => new Date(d.created_at).getTime() >= cutoff)
-      .reduce((s, d) => s + d.total_amount, 0);
-  }, [distributions]);
-
   const totalSupply = vault?.totalSupply ?? 1_000_000_000;
 
   return (
@@ -143,7 +127,7 @@ export default function Dashboard() {
           <p className="eyebrow mb-3">Overview</p>
           <h1 className="text-[36px] sm:text-[44px] font-semibold heading-display">Dashboard</h1>
           <p className="text-[15px] text-[#888] mt-3 max-w-[560px] leading-[1.55]">
-            Aggregate performance of the wallets we mirror, vault state, and the distribution ledger.
+            Live performance of the wallets we mirror, plus the $ABANK holder snapshot.
           </p>
         </div>
 
@@ -170,12 +154,12 @@ export default function Dashboard() {
               hint={`7d ${totals.pnl7d >= 0 ? "+" : "−"}${fmtUSD(Math.abs(totals.pnl7d))}`}
             />
             <Stat
-              label="Total Distributed"
-              value={vault ? fmtUSD(vault.totalDistributed) : "—"}
-              hint={vault ? `7d ${fmtUSD(last7dDistributions)}` : undefined}
+              label="Open Notional"
+              value={fmtUSD(totals.totalNtlPos)}
+              hint={`${totals.openPositions} positions`}
             />
             <Stat
-              label="Holders"
+              label="$ABANK Holders"
               value={vault ? vault.totalHolders.toLocaleString() : "—"}
               hint={vault?.lastSnapshotAt ? `Snapshot ${fmtRelative(vault.lastSnapshotAt)}` : undefined}
             />
@@ -184,33 +168,9 @@ export default function Dashboard() {
 
         {/* ─── Main grid ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left col: distributions + leaderboard */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Distribution history */}
-            <Panel title="Distribution history" subtitle={`${distributions.length} ${distributions.length === 1 ? "distribution" : "distributions"}`}>
-              {distributions.length === 0 ? (
-                <EmptyRow text="No distributions yet." />
-              ) : (
-                <div className="divide-y divide-black/[0.05]">
-                  {distributions.map((d) => (
-                    <div key={d.id} className="py-3.5 flex items-center justify-between gap-4">
-                      <div className="min-w-0">
-                        <p className="text-[14px] font-medium tracking-[-0.01em]">{d.notes || "Distribution"}</p>
-                        <p className="text-[12px] text-[#888] number-mono mt-0.5">
-                          {fmtDate(d.created_at)} · {d.holder_count} holders
-                        </p>
-                      </div>
-                      <span className="number-mono text-[14px] font-semibold text-[#00cc6a] shrink-0">
-                        {fmtUSD(d.total_amount)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Panel>
-
-            {/* Leaderboard */}
-            <Panel title="Holder leaderboard" subtitle={`Top ${Math.min(leaderboard.length, 10)} by balance`}>
+          {/* Leaderboard (wide) */}
+          <div className="lg:col-span-2">
+            <Panel title="Holder leaderboard" subtitle={`Top ${Math.min(leaderboard.length, 25)} by balance`}>
               {leaderboard.length === 0 ? (
                 <EmptyRow text="No holders snapshotted yet." />
               ) : (
@@ -222,10 +182,11 @@ export default function Dashboard() {
                         <th className="text-left px-1 py-2.5 font-medium">Wallet</th>
                         <th className="text-right px-1 py-2.5 font-medium">Balance</th>
                         <th className="text-right px-1 py-2.5 font-medium">% Supply</th>
+                        <th className="text-right px-1 py-2.5 font-medium hidden sm:table-cell">Last seen</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {leaderboard.slice(0, 10).map((h) => {
+                      {leaderboard.slice(0, 25).map((h) => {
                         const pct = totalSupply > 0 ? (h.balance / totalSupply) * 100 : 0;
                         return (
                           <tr key={h.publicKey} className="border-t border-black/[0.04] hover:bg-black/[0.02] transition-colors">
@@ -233,6 +194,7 @@ export default function Dashboard() {
                             <td className="px-1 py-3 number-mono text-[12.5px]">{truncateAddress(h.publicKey, 5, 4)}</td>
                             <td className="px-1 py-3 number-mono text-right font-medium">{fmtCompactNum(h.balance)}</td>
                             <td className="px-1 py-3 number-mono text-right text-[#888]">{pct.toFixed(2)}%</td>
+                            <td className="px-1 py-3 number-mono text-right text-[11px] text-[#aaa] hidden sm:table-cell">{h.lastSeen}</td>
                           </tr>
                         );
                       })}
@@ -243,15 +205,13 @@ export default function Dashboard() {
             </Panel>
           </div>
 
-          {/* Right col: vault info + followed traders */}
+          {/* Right col */}
           <div className="space-y-6">
             <Panel title="Vault state">
               <dl className="space-y-3.5">
                 <Row label="Total supply" value={`${fmtCompactNum(totalSupply)} $ABANK`} />
                 <Row label="Holders" value={vault?.totalHolders?.toLocaleString() ?? "—"} />
-                <Row label="Total distributed" value={vault ? fmtUSD(vault.totalDistributed) : "—"} />
                 <Row label="Last snapshot" value={fmtRelative(vault?.lastSnapshotAt ?? null)} />
-                <Row label="Last distribution" value={fmtRelative(vault?.lastDistributionAt ?? null)} />
               </dl>
             </Panel>
 

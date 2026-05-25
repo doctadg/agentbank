@@ -11,12 +11,9 @@ export function createAdminRouter() {
     catch (e: any) { res.status(500).json({ success: false, error: e.message }); }
   });
 
-  router.post('/distribute', (req: Request, res: Response) => {
-    try {
-      const { amount, notes } = req.body;
-      if (!amount || amount <= 0) { res.status(400).json({ error: 'Valid amount required' }); return; }
-      res.json({ success: true, data: svc.distributeRewards(amount, notes) });
-    } catch (e: any) { res.status(400).json({ success: false, error: e.message }); }
+  router.post('/reset', (_req: Request, res: Response) => {
+    try { res.json({ success: true, data: svc.resetData() }); }
+    catch (e: any) { res.status(500).json({ success: false, error: e.message }); }
   });
 
   router.get('/holders', (_req: Request, res: Response) => {

@@ -31,10 +31,5 @@ export function createHolderRouter() {
     catch (e: any) { res.status(500).json({ success: false, error: e.message }); }
   });
 
-  router.get('/:publicKey/rewards', (req: AuthenticatedRequest, res: Response) => {
-    try { res.json({ success: true, data: svc.getHolderRewards(req.params.publicKey) }); }
-    catch (e: any) { res.status(500).json({ success: false, error: e.message }); }
-  });
-
   return router;
 }

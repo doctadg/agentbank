@@ -45,19 +45,9 @@ function usePolled<T>(fetcher: () => Promise<T>, deps: React.DependencyList, ref
 
 // ─── Types ─────────────────────────────────────────────
 export interface VaultStats {
-  totalDistributed: number;
   totalHolders: number;
   totalSupply: number;
   lastSnapshotAt: string | null;
-  lastDistributionAt: string | null;
-}
-
-export interface Distribution {
-  id: string;
-  total_amount: number;
-  holder_count: number;
-  notes: string | null;
-  created_at: string;
 }
 
 export interface LeaderboardEntry {
@@ -73,7 +63,6 @@ export interface HolderPosition {
   holdingSince: string;
   holdingDays: number;
   avgBalance: number;
-  totalRewards: number;
 }
 
 // ─── Vault stats (holders, total distributed, supply) ──
@@ -87,19 +76,6 @@ export function useVaultStats(refreshMs = 30_000) {
     refreshMs,
   );
   return { stats: data, loading, error, refetch };
-}
-
-// ─── Distribution history ──────────────────────────────
-export function useDistributions(refreshMs = 60_000) {
-  const { data, loading, error, refetch } = usePolled<Distribution[]>(
-    async () => {
-      const r = await apiFetch<{ success: boolean; data: Distribution[] }>("/vault/distributions");
-      return r.data;
-    },
-    [],
-    refreshMs,
-  );
-  return { distributions: data ?? [], loading, error, refetch };
 }
 
 // ─── Holder leaderboard ────────────────────────────────

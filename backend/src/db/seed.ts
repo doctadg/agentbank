@@ -1,18 +1,6 @@
 import { getDb, closeDb } from './index';
 import crypto from 'crypto';
 
-function randomBase58(len: number): string {
-  const chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-  let r = '';
-  const bytes = crypto.randomBytes(len);
-  for (let i = 0; i < len; i++) r += chars[bytes[i] % chars.length];
-  return r;
-}
-
-function randomTxHash(): string {
-  return crypto.randomBytes(32).toString('hex');
-}
-
 const HOLDERS = [
   { pk: '9ZNTfG4NyQgxy2SWjSiQoUyBPEvXT2xo7fKc5hPYYJ7b', base: 487000 },
   { pk: 'DYW8H3fds9T9anZs2GCrHbKkPeXwaY8fSREqRc58oGZj', base: 245000 },
@@ -39,7 +27,7 @@ const HOLDERS = [
 function run() {
   const db = getDb();
 
-  // Create users for all holders
+  // Users for all holders
   for (const h of HOLDERS) {
     db.prepare('INSERT OR IGNORE INTO users (id, public_key) VALUES (?, ?)')
       .run(crypto.randomUUID(), h.pk);
@@ -57,56 +45,16 @@ function run() {
     }
   }
 
-  // 3 past distributions
-  const distributions = [
-    { amount: 5000, daysAgo: 21, notes: 'Weekly distribution #1' },
-    { amount: 3200, daysAgo: 14, notes: 'Weekly distribution #2' },
-    { amount: 6800, daysAgo: 7, notes: 'Weekly distribution #3' },
-  ];
-
-  for (const dist of distributions) {
-    const distId = crypto.randomUUID();
-    const createdAt = new Date(now - dist.daysAgo * 86400000).toISOString();
-
-    // Calculate weights at that point
-    const holders = db.prepare(`
-      SELECT public_key, AVG(balance) as avg_bal, COUNT(*) as days
-      FROM holder_snapshots
-      WHERE snapshot_date <= ?
-      GROUP BY public_key
-    `).all(createdAt.split('T')[0]) as { public_key: string; avg_bal: number; days: number }[];
-
-    const weights = holders.map(h => h.days * h.avg_bal);
-    const totalWeight = weights.reduce((a, b) => a + b, 0);
-    if (totalWeight === 0) continue;
-
-    db.prepare('INSERT INTO distributions (id, total_amount, holder_count, notes, created_at) VALUES (?, ?, ?, ?, ?)')
-      .run(distId, dist.amount, holders.length, dist.notes, createdAt);
-
-    for (let i = 0; i < holders.length; i++) {
-      const amt = Math.round((weights[i] / totalWeight) * dist.amount * 100) / 100;
-      if (amt <= 0) continue;
-      db.prepare('INSERT INTO reward_records (id, distribution_id, public_key, amount, holding_days, avg_balance, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(crypto.randomUUID(), distId, holders[i].public_key, amt, holders[i].days, Math.round(holders[i].avg_bal), createdAt);
-    }
-  }
-
-  // Admin key
   db.prepare('INSERT OR IGNORE INTO admin_keys (key) VALUES (?)').run('abank-admin-dev-key');
 
-  // Update vault state
-  const totalDist = (db.prepare('SELECT COALESCE(SUM(total_amount), 0) as t FROM distributions').get() as any).t;
-  const holderCount = HOLDERS.length;
   const nowStr = new Date().toISOString();
-  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-  db.prepare('UPDATE vault_state SET total_distributed = ?, total_holders = ?, last_snapshot_at = ?, last_distribution_at = ? WHERE id = 1')
-    .run(totalDist, holderCount, nowStr, weekAgo);
+  db.prepare('UPDATE vault_state SET total_holders = ?, last_snapshot_at = ? WHERE id = 1')
+    .run(HOLDERS.length, nowStr);
 
   closeDb();
   console.log(`Database seeded`);
   console.log(`  - ${HOLDERS.length} holders`);
   console.log(`  - 30 days of snapshots`);
-  console.log(`  - 3 distributions totaling $${totalDist}`);
   console.log(`  - Admin key: abank-admin-dev-key`);
 }
 

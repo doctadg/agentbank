@@ -26,18 +26,12 @@ export function getHolderPosition(publicKey: string) {
   const holdingSince = first?.snapshot_date || latest.snapshot_date;
   const holdingDays = Math.max(1, Math.floor((Date.now() - new Date(holdingSince).getTime()) / 86400000));
 
-  // Total rewards received
-  const rewards = db.prepare(
-    'SELECT COALESCE(SUM(amount), 0) as total FROM reward_records WHERE public_key = ?'
-  ).get(publicKey) as { total: number };
-
   return {
     publicKey,
     balance: latest.balance,
     holdingSince,
     holdingDays,
     avgBalance: Math.round(avg.avg_balance * 100) / 100,
-    totalRewards: rewards.total,
   };
 }
 
@@ -70,11 +64,4 @@ export function getHolderHistory(publicKey: string, limit = 30) {
   return db.prepare(
     'SELECT * FROM holder_snapshots WHERE public_key = ? ORDER BY snapshot_date DESC LIMIT ?'
   ).all(publicKey, limit);
-}
-
-export function getHolderRewards(publicKey: string) {
-  const db = getDb();
-  return db.prepare(
-    'SELECT * FROM reward_records WHERE public_key = ? ORDER BY created_at DESC'
-  ).all(publicKey);
 }
