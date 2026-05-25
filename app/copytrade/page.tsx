@@ -202,12 +202,11 @@ function HeroStrip({ totals }: { totals: ReturnType<typeof useCopytrade>["totals
         style={{ background: profitable ? "radial-gradient(circle, rgba(0,255,136,0.08), transparent 70%)" : "radial-gradient(circle, rgba(255,68,68,0.08), transparent 70%)" }}
         animate={{ scale: [1, 1.1, 1], opacity: [0.6, 0.85, 0.6] }} transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
       />
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-white/[0.07] relative">
-        <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" />
-        <span className="w-2.5 h-2.5 rounded-full bg-[#febc2e]" />
-        <span className="w-2.5 h-2.5 rounded-full bg-[#28c840]" />
-        <span className="ml-3 text-[11px] text-white/30 number-mono">copytrade.hyperliquid.live</span>
-        <span className="ml-auto flex items-center gap-1.5">
+      <div className="flex items-center justify-between gap-2 px-6 py-3 border-b border-white/[0.07] relative">
+        <a href="https://api.hyperliquid.xyz/info" target="_blank" rel="noreferrer" className="text-[10.5px] uppercase tracking-[0.14em] text-white/40 font-medium hover:text-white/60 transition-colors">
+          api.hyperliquid.xyz / info
+        </a>
+        <span className="flex items-center gap-1.5">
           <LivePulse color="#00ff88" size={6} />
           <span className="text-[10px] uppercase tracking-[0.14em] text-white/40 font-medium">Streaming</span>
         </span>
