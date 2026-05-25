@@ -47,7 +47,22 @@ CREATE TABLE IF NOT EXISTS admin_keys (
   key TEXT PRIMARY KEY,
   created_at TEXT DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS agent_events (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  symbol TEXT,
+  side TEXT,
+  price REAL,
+  size REAL,
+  pnl REAL,
+  message TEXT NOT NULL,
+  detail TEXT,
+  metadata TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
 CREATE INDEX IF NOT EXISTS idx_snapshots_public_key ON holder_snapshots(public_key);
 CREATE INDEX IF NOT EXISTS idx_snapshots_date ON holder_snapshots(snapshot_date);
 CREATE INDEX IF NOT EXISTS idx_reward_records_distribution ON reward_records(distribution_id);
 CREATE INDEX IF NOT EXISTS idx_reward_records_public_key ON reward_records(public_key);
+CREATE INDEX IF NOT EXISTS idx_agent_events_created_at ON agent_events(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_events_type ON agent_events(type);

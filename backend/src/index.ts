@@ -8,6 +8,7 @@ import authRoutes from './auth/routes';
 import { createHolderRouter } from './holder/routes';
 import { createVaultRouter } from './vault/routes';
 import { createAdminRouter } from './admin/routes';
+import { createAgentRouter } from './agent/routes';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -18,6 +19,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/vault', createVaultRouter());
 app.use('/api/holder', createHolderRouter());
 app.use('/api/admin', createAdminRouter());
+app.use('/api/agent', createAgentRouter());
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 app.use(errorHandler);
@@ -25,7 +27,7 @@ app.use(errorHandler);
 initDb();
 app.listen(config.port, () => {
   console.log(`🚀 AgentBank API on port ${config.port}`);
-  console.log(`   /api/auth /api/holder /api/vault /api/admin`);
+  console.log(`   /api/auth /api/holder /api/vault /api/admin /api/agent`);
 });
 
 process.on('SIGINT', () => { closeDb(); process.exit(0); });

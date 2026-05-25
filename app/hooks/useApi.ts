@@ -195,6 +195,84 @@ export function useSystemStatus(refreshMs = 15000) {
   return { status, loading, error, refetch: fetch_ };
 }
 
+// ─── Agent activity ────────────────────────────────────
+export type AgentEventType =
+  | "trade_open" | "trade_close" | "signal" | "reasoning" | "distribution" | "snapshot" | "system";
+
+export interface AgentEvent {
+  id: string;
+  type: AgentEventType;
+  symbol: string | null;
+  side: "long" | "short" | null;
+  price: number | null;
+  size: number | null;
+  pnl: number | null;
+  message: string;
+  detail: string | null;
+  metadata: string | null;
+  created_at: string;
+}
+
+export interface AgentActivityStats {
+  total: number;
+  last24h: number;
+  latestAt: string | null;
+  byType: Partial<Record<AgentEventType, number>>;
+}
+
+export function useAgentActivity(types: AgentEventType[] = [], limit = 50, refreshMs = 5000) {
+  const [events, setEvents] = useState<AgentEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const typesKey = types.join(",");
+
+  const fetch_ = useCallback(async () => {
+    try {
+      const qs = new URLSearchParams();
+      qs.set("limit", String(limit));
+      if (typesKey) qs.set("types", typesKey);
+      const res = await apiFetch<{ success: boolean; data: { events: AgentEvent[] } }>(`/agent/activity?${qs}`);
+      setEvents(res.data.events);
+      setError(null);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [typesKey, limit]);
+
+  useEffect(() => {
+    fetch_();
+    const iv = setInterval(fetch_, refreshMs);
+    return () => clearInterval(iv);
+  }, [fetch_, refreshMs]);
+
+  return { events, loading, error, refetch: fetch_ };
+}
+
+export function useAgentActivityStats(refreshMs = 10000) {
+  const [stats, setStats] = useState<AgentActivityStats | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch_ = useCallback(async () => {
+    try {
+      const res = await apiFetch<{ success: boolean; data: AgentActivityStats }>("/agent/activity/stats");
+      setStats(res.data);
+      setError(null);
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetch_();
+    const iv = setInterval(fetch_, refreshMs);
+    return () => clearInterval(iv);
+  }, [fetch_, refreshMs]);
+
+  return { stats, error, refetch: fetch_ };
+}
+
 // ─── Hook: WebSocket for real-time updates ─────────────
 export function useWebSocket() {
   const [connected, setConnected] = useState(false);

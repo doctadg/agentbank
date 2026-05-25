@@ -147,6 +147,7 @@ export default function Home() {
             <a href="#how" className="hover:text-[#171717] transition-colors">How It Works</a>
             <a href="#earn" className="hover:text-[#171717] transition-colors">Earn</a>
             <a href="#fees" className="hover:text-[#171717] transition-colors">Fees</a>
+            <a href="/activity" className="hover:text-[#171717] transition-colors">Activity</a>
             <a href="/dashboard" className="hover:text-[#171717] transition-colors">Dashboard</a>
           </div>
           <MagBtn href="/dashboard" className="btn-primary inline-flex items-center gap-2 text-[12.5px] px-4 py-1.5">
