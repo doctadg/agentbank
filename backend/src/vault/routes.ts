@@ -1,32 +1,15 @@
 import { Router, Response } from 'express';
-import * as service from './service';
+import * as svc from './service';
 
-/**
- * Vault Routes — public, no auth required
- * Mounted at /api/vault
- */
 export function createVaultRouter() {
   const router = Router();
-
-  // GET /api/vault/stats
   router.get('/stats', (_req, res: Response) => {
-    try {
-      const stats = service.getVaultStats();
-      res.json({ success: true, data: stats });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
+    try { res.json({ success: true, data: svc.getVaultStats() }); }
+    catch (e: any) { res.status(500).json({ success: false, error: e.message }); }
   });
-
-  // GET /api/vault/distributions
   router.get('/distributions', (_req, res: Response) => {
-    try {
-      const distributions = service.getDistributions();
-      res.json({ success: true, data: distributions });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
+    try { res.json({ success: true, data: svc.getDistributions() }); }
+    catch (e: any) { res.status(500).json({ success: false, error: e.message }); }
   });
-
   return router;
 }
