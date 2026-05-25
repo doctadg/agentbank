@@ -1,26 +1,95 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-cream: #f4f1ea;
+  --color-dark: #171717;
+  --color-green: #00ff88;
+  --color-green-muted: #00cc6a;
+  --color-body: #4d4d4d;
+  --color-muted: #999;
+  --color-border: rgba(0, 0, 0, 0.06);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+html { scroll-behavior: auto; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-cream);
+  color: var(--color-dark);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* Geist-inspired number mono */
+.number-mono {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  font-feature-settings: 'tnum' on, 'lnum' on;
+}
+
+/* Stripe-style ss01 + tight tracking */
+.heading-display {
+  font-feature-settings: 'ss01' on;
+  letter-spacing: -0.04em;
+  line-height: 1.0;
+}
+
+.heading-section {
+  font-feature-settings: 'ss01' on;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+/* Vercel shadow-as-border */
+.shadow-border {
+  box-shadow: 0px 0px 0px 1px rgba(0, 0, 0, 0.06);
+}
+
+.shadow-border-hover:hover {
+  box-shadow: 0px 0px 0px 1px rgba(0, 0, 0, 0.12), 0px 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Stripe blue-tinted shadow adapted to cream */
+.card-elevated {
+  box-shadow: rgba(50, 50, 60, 0.12) 0px 20px 40px -20px, rgba(0, 0, 0, 0.06) 0px 8px 16px -8px;
+}
+
+/* Pill buttons (Revolut-inspired) */
+.btn-primary {
+  background: #171717;
+  color: white;
+  border-radius: 9999px;
+  padding: 12px 28px;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+.btn-primary:hover { background: #000; }
+
+.btn-secondary {
+  background: transparent;
+  color: #171717;
+  border-radius: 9999px;
+  padding: 12px 28px;
+  font-weight: 500;
+  font-size: 14px;
+  box-shadow: 0px 0px 0px 1px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
+}
+.btn-secondary:hover {
+  box-shadow: 0px 0px 0px 1px rgba(0,0,0,0.2);
+}
+
+/* Section divider */
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,0,0,0.06) 20%, rgba(0,0,0,0.06) 80%, transparent);
+}
+
+/* Smooth scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--color-cream); }
+::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
+
+/* Selection */
+::selection { background: rgba(0, 255, 136, 0.2); color: #171717; }
