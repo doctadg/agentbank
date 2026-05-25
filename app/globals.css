@@ -15,29 +15,41 @@ html { scroll-behavior: auto; }
 body {
   background-color: var(--color-cream);
   color: var(--color-dark);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Satoshi', 'Inter', system-ui, -apple-system, sans-serif;
+  font-feature-settings: 'ss01' on, 'ss02' on, 'ss03' on;
+  letter-spacing: -0.011em;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-/* Geist-inspired number mono */
 .number-mono {
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
-  font-feature-settings: 'tnum' on, 'lnum' on;
+  font-feature-settings: 'tnum' on, 'lnum' on, 'ss02' on;
+  letter-spacing: -0.02em;
 }
 
-/* Stripe-style ss01 + tight tracking */
 .heading-display {
-  font-feature-settings: 'ss01' on;
-  letter-spacing: -0.04em;
-  line-height: 1.0;
+  font-family: 'Satoshi', 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+  font-feature-settings: 'ss01' on, 'ss02' on, 'ss03' on;
 }
 
 .heading-section {
-  font-feature-settings: 'ss01' on;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
+  font-family: 'Satoshi', 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  font-feature-settings: 'ss01' on, 'ss02' on, 'ss03' on;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--color-green-muted);
 }
 
 /* Vercel shadow-as-border */
@@ -54,30 +66,36 @@ body {
   box-shadow: rgba(50, 50, 60, 0.12) 0px 20px 40px -20px, rgba(0, 0, 0, 0.06) 0px 8px 16px -8px;
 }
 
-/* Pill buttons (Revolut-inspired) */
 .btn-primary {
   background: #171717;
   color: white;
   border-radius: 9999px;
-  padding: 12px 28px;
+  padding: 11px 22px;
   font-weight: 500;
-  font-size: 14px;
-  transition: all 0.2s ease;
+  font-size: 13.5px;
+  letter-spacing: -0.005em;
+  transition: background 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 1px 2px rgba(0,0,0,0.08);
 }
-.btn-primary:hover { background: #000; }
+.btn-primary:hover {
+  background: #000;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.08) inset, 0 4px 14px rgba(0,0,0,0.18);
+}
 
 .btn-secondary {
   background: transparent;
   color: #171717;
   border-radius: 9999px;
-  padding: 12px 28px;
+  padding: 11px 22px;
   font-weight: 500;
-  font-size: 14px;
+  font-size: 13.5px;
+  letter-spacing: -0.005em;
   box-shadow: 0px 0px 0px 1px rgba(0,0,0,0.1);
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
 }
 .btn-secondary:hover {
-  box-shadow: 0px 0px 0px 1px rgba(0,0,0,0.2);
+  box-shadow: 0px 0px 0px 1px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.04);
+  background: rgba(255,255,255,0.4);
 }
 
 /* Section divider */
