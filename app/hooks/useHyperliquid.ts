@@ -3,15 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const HL_API = "https://api.hyperliquid.xyz/info";
+const HL_WS = "wss://api.hyperliquid.xyz/ws";
 
 // ─── Types ─────────────────────────────────────────────
 export interface HLFill {
   coin: string;
   px: string;
   sz: string;
-  side: "A" | "B"; // A = sell (ask), B = buy (bid)
+  side: "A" | "B";
   time: number;
-  dir: string; // "Open Long" | "Close Long" | "Open Short" | "Close Short" | "Buy" | "Sell"
+  dir: string;
   closedPnl: string;
   fee: string;
   hash: string;
@@ -25,7 +26,7 @@ export interface HLFill {
 
 export interface HLPosition {
   coin: string;
-  szi: string; // signed size, negative = short
+  szi: string;
   entryPx: string;
   positionValue: string;
   unrealizedPnl: string;
@@ -50,79 +51,235 @@ export interface HLClearinghouseState {
   time: number;
 }
 
-// ─── Fetch helper with simple cache + 429 backoff ──────
-const _inflight = new Map<string, Promise<unknown>>();
-const _cache = new Map<string, { ts: number; data: unknown }>();
-let _backoffUntil = 0;
-
-async function hlPost<T>(body: object, signal?: AbortSignal, cacheMs = 4500): Promise<T> {
-  const key = JSON.stringify(body);
-  const now = Date.now();
-  const cached = _cache.get(key);
-  if (cached && now - cached.ts < cacheMs) return cached.data as T;
-  if (now < _backoffUntil) {
-    if (cached) return cached.data as T;
-    throw new Error("HL backoff");
-  }
-  const existing = _inflight.get(key);
-  if (existing) return existing as Promise<T>;
-  const p = (async () => {
-    try {
-      const res = await fetch(HL_API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal,
-      });
-      if (res.status === 429) {
-        _backoffUntil = Date.now() + 15_000;
-        if (cached) return cached.data as T;
-        throw new Error("HL API 429");
-      }
-      if (!res.ok) throw new Error(`HL API ${res.status}`);
-      const data = (await res.json()) as T;
-      _cache.set(key, { ts: Date.now(), data });
-      return data;
-    } finally {
-      _inflight.delete(key);
-    }
-  })();
-  _inflight.set(key, p);
-  return p;
+// ─── HTTP (only for one-shot historical backfill) ──────
+async function hlPost<T>(body: object, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(HL_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!res.ok) throw new Error(`HL API ${res.status}`);
+  return res.json();
 }
 
-// ─── Single trader hook ────────────────────────────────
-export function useHyperliquidTrader(address: string, refreshMs = 12_000, fillWindowDays = 2) {
+// ─── Shared WebSocket manager ──────────────────────────
+type Listener<T = any> = (data: T) => void;
+
+let _ws: WebSocket | null = null;
+let _opening: Promise<WebSocket> | null = null;
+let _pingInterval: ReturnType<typeof setInterval> | null = null;
+let _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let _reconnectAttempt = 0;
+const _channelListeners = new Map<string, Set<Listener>>();
+const _activeSubs = new Map<string, object>();
+
+type WSStatus = "connecting" | "open" | "closed";
+let _status: WSStatus = "closed";
+const _statusListeners = new Set<(s: WSStatus) => void>();
+
+function setStatus(s: WSStatus) {
+  if (_status === s) return;
+  _status = s;
+  for (const l of _statusListeners) l(s);
+}
+
+function channelKeyFromMsg(msg: any): string | null {
+  if (msg.channel === "userFills") return `userFills:${(msg.data?.user || "").toLowerCase()}`;
+  if (msg.channel === "webData2") return `webData2:${(msg.data?.user || "").toLowerCase()}`;
+  if (msg.channel) return msg.channel;
+  return null;
+}
+
+function channelKeyFromSub(sub: any): string {
+  if (sub.type === "userFills") return `userFills:${(sub.user || "").toLowerCase()}`;
+  if (sub.type === "webData2") return `webData2:${(sub.user || "").toLowerCase()}`;
+  return sub.type ?? JSON.stringify(sub);
+}
+
+function connect(): Promise<WebSocket> {
+  if (typeof window === "undefined") return Promise.reject(new Error("no window"));
+  if (_ws && _ws.readyState === WebSocket.OPEN) return Promise.resolve(_ws);
+  if (_opening) return _opening;
+
+  setStatus("connecting");
+  _opening = new Promise((resolve, reject) => {
+    const sock = new WebSocket(HL_WS);
+
+    sock.onopen = () => {
+      _ws = sock;
+      _reconnectAttempt = 0;
+      setStatus("open");
+      // Resubscribe everything
+      for (const sub of _activeSubs.values()) {
+        try { sock.send(JSON.stringify({ method: "subscribe", subscription: sub })); } catch {}
+      }
+      // Keepalive
+      if (_pingInterval) clearInterval(_pingInterval);
+      _pingInterval = setInterval(() => {
+        if (sock.readyState === WebSocket.OPEN) {
+          try { sock.send(JSON.stringify({ method: "ping" })); } catch {}
+        }
+      }, 30_000);
+      resolve(sock);
+    };
+
+    sock.onmessage = (event) => {
+      let msg: any;
+      try { msg = JSON.parse(event.data); } catch { return; }
+      if (msg.channel === "pong" || msg.channel === "subscriptionResponse") return;
+      const key = channelKeyFromMsg(msg);
+      if (!key) return;
+      const listeners = _channelListeners.get(key);
+      if (!listeners) return;
+      for (const l of listeners) {
+        try { l(msg.data); } catch {}
+      }
+    };
+
+    const cleanup = () => {
+      if (_pingInterval) { clearInterval(_pingInterval); _pingInterval = null; }
+      _ws = null;
+      _opening = null;
+      setStatus("closed");
+      // Reconnect with backoff if anyone still subscribed
+      if (_activeSubs.size > 0) {
+        _reconnectAttempt++;
+        const delay = Math.min(15_000, 500 * Math.pow(1.5, _reconnectAttempt));
+        if (_reconnectTimer) clearTimeout(_reconnectTimer);
+        _reconnectTimer = setTimeout(() => { connect().catch(() => {}); }, delay);
+      }
+    };
+
+    sock.onclose = cleanup;
+    sock.onerror = () => {
+      try { sock.close(); } catch {}
+      reject(new Error("ws error"));
+    };
+  });
+  return _opening;
+}
+
+function subscribe<T = any>(sub: object, listener: Listener<T>): () => void {
+  const key = channelKeyFromSub(sub);
+  let set = _channelListeners.get(key);
+  const isFirst = !set;
+  if (!set) {
+    set = new Set();
+    _channelListeners.set(key, set);
+    _activeSubs.set(key, sub);
+  }
+  set.add(listener as Listener);
+
+  if (isFirst) {
+    connect()
+      .then((sock) => {
+        if (sock.readyState === WebSocket.OPEN) {
+          sock.send(JSON.stringify({ method: "subscribe", subscription: sub }));
+        }
+      })
+      .catch(() => {});
+  }
+
+  return () => {
+    const s = _channelListeners.get(key);
+    if (!s) return;
+    s.delete(listener as Listener);
+    if (s.size === 0) {
+      _channelListeners.delete(key);
+      _activeSubs.delete(key);
+      if (_ws && _ws.readyState === WebSocket.OPEN) {
+        try { _ws.send(JSON.stringify({ method: "unsubscribe", subscription: sub })); } catch {}
+      }
+    }
+  };
+}
+
+export function useHLConnection() {
+  const [status, setStatus] = useState<WSStatus>(_status);
+  useEffect(() => {
+    const l = (s: WSStatus) => setStatus(s);
+    _statusListeners.add(l);
+    return () => { _statusListeners.delete(l); };
+  }, []);
+  return status;
+}
+
+// ─── Single trader hook (WS + one-shot HTTP backfill) ──
+export function useHyperliquidTrader(address: string, fillWindowDays = 2) {
   const [fills, setFills] = useState<HLFill[]>([]);
   const [state, setState] = useState<HLClearinghouseState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAll = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const since = Date.now() - fillWindowDays * 86400_000;
-      const [f, s] = await Promise.all([
-        hlPost<HLFill[] | null>({ type: "userFillsByTime", user: address, startTime: since }, signal),
-        hlPost<HLClearinghouseState>({ type: "clearinghouseState", user: address }, signal),
-      ]);
-      if (Array.isArray(f)) setFills(f);
-      if (s) setState(s);
-      setError(null);
-    } catch (e: any) {
-      if (e.name !== "AbortError" && e.message !== "HL backoff") setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    let mounted = true;
+    const ctrl = new AbortController();
+
+    // 1. One-shot HTTP backfill so we have 24h+ history immediately for stats
+    (async () => {
+      try {
+        const since = Date.now() - fillWindowDays * 86400_000;
+        const f = await hlPost<HLFill[] | null>(
+          { type: "userFillsByTime", user: address, startTime: since },
+          ctrl.signal,
+        );
+        if (!mounted) return;
+        if (Array.isArray(f) && f.length > 0) {
+          setFills((prev) => mergeFills(prev, f));
+        }
+      } catch (e: any) {
+        if (e.name !== "AbortError") {
+          // Silent — WS snapshot will still arrive
+        }
+      }
+    })();
+
+    // 2. Subscribe to live fills
+    const unsubFills = subscribe<{ isSnapshot?: boolean; user: string; fills: HLFill[] }>(
+      { type: "userFills", user: address },
+      (data) => {
+        if (!mounted) return;
+        const incoming = data?.fills ?? [];
+        if (incoming.length > 0) {
+          setFills((prev) => mergeFills(prev, incoming));
+        }
+        setLoading(false);
+        setError(null);
+      },
+    );
+
+    // 3. Subscribe to webData2 for live position/margin state
+    const unsubWeb = subscribe<{ clearinghouseState?: HLClearinghouseState; user: string }>(
+      { type: "webData2", user: address },
+      (data) => {
+        if (!mounted) return;
+        if (data?.clearinghouseState) {
+          setState(data.clearinghouseState);
+          setLoading(false);
+          setError(null);
+        }
+      },
+    );
+
+    return () => {
+      mounted = false;
+      ctrl.abort();
+      unsubFills();
+      unsubWeb();
+    };
   }, [address, fillWindowDays]);
 
-  useEffect(() => {
-    const ctrl = new AbortController();
-    fetchAll(ctrl.signal);
-    const iv = setInterval(() => fetchAll(ctrl.signal), refreshMs);
-    return () => { ctrl.abort(); clearInterval(iv); };
-  }, [fetchAll, refreshMs]);
+  return { fills, state, loading, error };
+}
 
-  return { fills, state, loading, error, refetch: fetchAll };
+function mergeFills(prev: HLFill[], incoming: HLFill[]): HLFill[] {
+  const seen = new Set(prev.map((f) => f.tid));
+  const fresh = incoming.filter((f) => !seen.has(f.tid));
+  if (fresh.length === 0) return prev;
+  const merged = [...fresh, ...prev];
+  merged.sort((a, b) => b.time - a.time);
+  return merged.length > 1000 ? merged.slice(0, 1000) : merged;
 }
 
 // ─── Derived stats per trader ──────────────────────────
@@ -173,23 +330,28 @@ export function computeStats(address: string, fills: HLFill[], state: HLClearing
 }
 
 // ─── Multi-trader combined hook ────────────────────────
-export function useCopytrade(addresses: string[], refreshMs = 5000) {
-  const traders = addresses.map((addr) => useHyperliquidTrader(addr, refreshMs)); // eslint-disable-line react-hooks/rules-of-hooks
+// NOTE: the `refreshMs` arg is accepted for backwards compat but ignored
+// (we now stream via WebSocket).
+export function useCopytrade(addresses: string[], _refreshMs?: number) {
+  const traders = addresses.map((addr) => useHyperliquidTrader(addr)); // eslint-disable-line react-hooks/rules-of-hooks
 
   const stats = traders.map((t, i) => computeStats(addresses[i], t.fills, t.state));
 
   const loading = traders.every((t) => t.loading);
   const error = traders.find((t) => t.error)?.error ?? null;
 
+  const fillsLenKey = traders.map((t) => t.fills.length).join(",");
+  const posLenKey = stats.map((s) => s.positions.length).join(",");
+
   const combinedFills = useMemo(() => {
     return traders
       .flatMap((t, i) => t.fills.map((f) => ({ fill: f, trader: addresses[i] })))
       .sort((a, b) => b.fill.time - a.fill.time);
-  }, [traders.map((t) => t.fills).flat().length, addresses.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fillsLenKey, addresses.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const combinedPositions = useMemo(() => {
     return stats.flatMap((s) => s.positions.map((p) => ({ pos: p, trader: s.address })));
-  }, [stats.map((s) => s.positions.length).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [posLenKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totals = {
     accountValue: stats.reduce((s, t) => s + t.accountValue, 0),
@@ -218,7 +380,6 @@ export function isLong(p: HLPosition) {
 }
 
 export function parseFillSide(f: HLFill): "long" | "short" | "buy" | "sell" {
-  // Use dir for more info: Open Long, Close Long, Open Short, Close Short
   if (f.dir.includes("Long")) return "long";
   if (f.dir.includes("Short")) return "short";
   return f.side === "B" ? "buy" : "sell";

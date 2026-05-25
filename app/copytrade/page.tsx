@@ -203,8 +203,8 @@ function HeroStrip({ totals }: { totals: ReturnType<typeof useCopytrade>["totals
         animate={{ scale: [1, 1.1, 1], opacity: [0.6, 0.85, 0.6] }} transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
       />
       <div className="flex items-center justify-between gap-2 px-6 py-3 border-b border-white/[0.07] relative">
-        <a href="https://api.hyperliquid.xyz/info" target="_blank" rel="noreferrer" className="text-[10.5px] uppercase tracking-[0.14em] text-white/40 font-medium hover:text-white/60 transition-colors">
-          api.hyperliquid.xyz / info
+        <a href="https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/websocket" target="_blank" rel="noreferrer" className="text-[10.5px] uppercase tracking-[0.14em] text-white/40 font-medium hover:text-white/60 transition-colors">
+          wss://api.hyperliquid.xyz/ws
         </a>
         <span className="flex items-center gap-1.5">
           <LivePulse color="#00ff88" size={6} />
@@ -419,7 +419,7 @@ export default function CopyTradePage() {
               </div>
               <div className="flex items-center gap-1.5">
                 <LivePulse size={5} />
-                <span className="text-[10px] uppercase tracking-[0.14em] text-[#888] font-medium">Refresh 10s</span>
+                <span className="text-[10px] uppercase tracking-[0.14em] text-[#888] font-medium">Streaming</span>
               </div>
             </div>
 
