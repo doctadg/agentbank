@@ -1,38 +1,31 @@
 # syntax=docker/dockerfile:1
-FROM node:22-slim AS base
+ARG NODE_VERSION=22
 
-# Build prerequisites for better-sqlite3 prebuilds + native fallback
+# ─── build stage: install deps + compile TS + prune devDeps ──
+FROM node:${NODE_VERSION}-slim AS build
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 make g++ ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-
-# ─── deps ─────────────────────────────────────────────
-FROM base AS deps
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
-# ─── build ────────────────────────────────────────────
-FROM base AS build
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY tsconfig.json ./
+COPY src ./src
 RUN npm run build
+RUN npm prune --omit=dev
 
-# ─── runtime ──────────────────────────────────────────
-FROM node:22-slim AS runtime
-WORKDIR /app
-
-# Just what we need to run
-COPY package.json package-lock.json ./
+# ─── runtime stage: slim, deps already compiled ─────────────
+FROM node:${NODE_VERSION}-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
-  && rm -rf /var/lib/apt/lists/* \
-  && npm ci --omit=dev --no-audit --no-fund
+  && rm -rf /var/lib/apt/lists/*
 
+WORKDIR /app
+COPY --from=build /app/package.json ./
+COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/src/db/schema.sql ./dist/db/schema.sql
 
-# Fly volume mounts to /data
 ENV NODE_ENV=production
 ENV PORT=8080
 ENV DB_PATH=/data/agentbank.db

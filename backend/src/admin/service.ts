@@ -1,7 +1,7 @@
 import { getDb } from '../db';
 import crypto from 'crypto';
 import { config } from '../config';
-import { getAllHolders } from '../holder/helius';
+import { getAllHolders as fetchHoldersFromHelius, type HolderBalance } from '../holder/helius';
 
 /**
  * Snapshot today's holder balances.
@@ -15,11 +15,11 @@ export async function snapshotHolders() {
 
   // ─── Real mode: Helius ─────────────────────────────
   if (config.abankMint) {
-    const holders = await getAllHolders(config.abankMint);
+    const holders: HolderBalance[] = await fetchHoldersFromHelius(config.abankMint);
     const insert = db.prepare(
       'INSERT OR IGNORE INTO holder_snapshots (id, public_key, balance, snapshot_date) VALUES (?, ?, ?, ?)',
     );
-    const tx = db.transaction((rows: typeof holders) => {
+    const tx = db.transaction((rows: HolderBalance[]) => {
       for (const h of rows) insert.run(crypto.randomUUID(), h.owner, h.balance, today);
     });
     tx(holders);
