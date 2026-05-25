@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -403,11 +404,8 @@ function StakingPageContent() {
         style={{ boxShadow: "0px 0px 0px 1px rgba(0,0,0,0.04)" }}
       >
         <div className="max-w-[1080px] mx-auto px-6 h-14 flex items-center justify-between">
-          <a href="/" className="text-[15px] font-semibold tracking-tight flex items-center gap-2">
-            <span className="w-7 h-7 rounded-md bg-[#171717] flex items-center justify-center text-[#00ff88] text-[10px] font-bold number-mono">
-              A
-            </span>
-            Agent<span className="text-[#00ff88]">Bank</span>
+          <a href="/" className="flex items-center gap-2">
+            <Image src="/logo.png" alt="AgentBank" width={112} height={37} priority />
           </a>
           <div className="hidden md:flex items-center gap-7 text-[13px] font-medium text-[#999]">
             <a href="/" className="hover:text-[#171717] transition-colors">Home</a>
