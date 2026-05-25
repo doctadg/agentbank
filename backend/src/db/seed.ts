@@ -91,125 +91,6 @@ function run() {
     }
   }
 
-  // Agent activity events — last 48h of realistic actions
-  db.prepare('DELETE FROM agent_events').run();
-  const eventNow = Date.now();
-  const symbols = ['BTC-PERP', 'ETH-PERP', 'SOL-PERP', 'HYPE-PERP', 'ARB-PERP', 'AVAX-PERP'];
-  const signalTemplates = [
-    (s: string) => `Bullish RSI divergence detected on ${s} 4h`,
-    (s: string) => `${s} broke key resistance with 2.3x avg volume`,
-    (s: string) => `Funding flipped negative on ${s} — shorts paying longs`,
-    (s: string) => `${s} reclaimed 50d EMA on rising volume`,
-    (s: string) => `Liquidity sweep below ${s} swing low, no follow-through`,
-  ];
-  const reasonTemplates = [
-    'Risk model: maintained 0.6% portfolio risk per trade. Conviction score 7.2/10 across momentum + orderflow signals.',
-    'Position sizing reduced 30% after 3 consecutive winners — mean reversion in win rate expected.',
-    'Skipping setup despite signal — open interest extended, weekend liquidity thin.',
-    'Cross-asset confluence: BTC dominance falling + SOL strength + alt funding neutral. Rotating into mid-caps.',
-    'Hedging long BTC delta with short ETH on relative strength divergence.',
-  ];
-  const closeReasons = ['take profit hit', 'stop loss', 'invalidation', 'trailing stop', 'time-based exit'];
-
-  const events: Array<Parameters<typeof require>[0] extends never ? any : any> = [];
-
-  // System startup
-  events.push({
-    t: eventNow - 47.8 * 3600_000,
-    type: 'system',
-    message: 'Agent online · connected to Hyperliquid',
-    detail: 'WebSocket subscriptions: orderbook, trades, funding. Latency 28ms.',
-  });
-
-  // Distribution event (7 days ago, but show "Distribution scheduled" recently)
-  events.push({
-    t: eventNow - 36 * 3600_000,
-    type: 'distribution',
-    pnl: 6800,
-    message: 'Weekly distribution sent · $6,800',
-    detail: 'Reward to 20 holders. Largest share: 0.487M tokens (0.049% APR contribution).',
-  });
-
-  // Build interleaved trade + signal + reasoning timeline
-  const sequence = [
-    { offset: 32, type: 'signal', sym: 'BTC-PERP' },
-    { offset: 31.5, type: 'reasoning' },
-    { offset: 31, type: 'trade_open', sym: 'BTC-PERP', side: 'long', price: 96340, size: 18500 },
-    { offset: 28, type: 'signal', sym: 'SOL-PERP' },
-    { offset: 27.5, type: 'trade_open', sym: 'SOL-PERP', side: 'long', price: 218.42, size: 9200 },
-    { offset: 24, type: 'trade_close', sym: 'BTC-PERP', side: 'long', price: 97120, size: 18500, pnl: 149.85 },
-    { offset: 22, type: 'reasoning' },
-    { offset: 20, type: 'signal', sym: 'HYPE-PERP' },
-    { offset: 19, type: 'trade_open', sym: 'HYPE-PERP', side: 'long', price: 34.18, size: 14000 },
-    { offset: 16.5, type: 'snapshot' },
-    { offset: 14, type: 'signal', sym: 'ETH-PERP' },
-    { offset: 13.5, type: 'trade_open', sym: 'ETH-PERP', side: 'short', price: 3420, size: 11000 },
-    { offset: 11, type: 'trade_close', sym: 'SOL-PERP', side: 'long', price: 224.10, size: 9200, pnl: 238.94 },
-    { offset: 9, type: 'reasoning' },
-    { offset: 7.5, type: 'trade_close', sym: 'HYPE-PERP', side: 'long', price: 33.05, size: 14000, pnl: -462.50 },
-    { offset: 5, type: 'signal', sym: 'ARB-PERP' },
-    { offset: 4.5, type: 'trade_open', sym: 'ARB-PERP', side: 'long', price: 0.812, size: 7600 },
-    { offset: 3, type: 'trade_close', sym: 'ETH-PERP', side: 'short', price: 3380, size: 11000, pnl: 128.65 },
-    { offset: 1.8, type: 'signal', sym: 'AVAX-PERP' },
-    { offset: 1.4, type: 'reasoning' },
-    { offset: 0.9, type: 'snapshot' },
-    { offset: 0.5, type: 'trade_open', sym: 'AVAX-PERP', side: 'long', price: 42.18, size: 8400 },
-    { offset: 0.15, type: 'signal', sym: 'BTC-PERP' },
-  ];
-
-  let sigIdx = 0;
-  let reasonIdx = 0;
-  for (const e of sequence) {
-    const t = eventNow - e.offset * 3600_000;
-    if (e.type === 'signal') {
-      const tpl = signalTemplates[sigIdx++ % signalTemplates.length];
-      events.push({ t, type: 'signal', symbol: e.sym, message: tpl(e.sym!), detail: null });
-    } else if (e.type === 'reasoning') {
-      events.push({ t, type: 'reasoning', message: 'Risk model update', detail: reasonTemplates[reasonIdx++ % reasonTemplates.length] });
-    } else if (e.type === 'trade_open') {
-      const verb = e.side === 'long' ? 'Opened LONG' : 'Opened SHORT';
-      events.push({
-        t, type: 'trade_open', symbol: e.sym, side: e.side, price: e.price, size: e.size,
-        message: `${verb} ${e.sym} · $${e.size!.toLocaleString()} @ $${e.price}`,
-        detail: null,
-      });
-    } else if (e.type === 'trade_close') {
-      const reason = closeReasons[Math.floor(Math.random() * closeReasons.length)];
-      const pnlStr = (e.pnl! >= 0 ? '+$' : '-$') + Math.abs(e.pnl!).toFixed(2);
-      events.push({
-        t, type: 'trade_close', symbol: e.sym, side: e.side, price: e.price, size: e.size, pnl: e.pnl,
-        message: `Closed ${e.sym} · ${pnlStr} · ${reason}`,
-        detail: null,
-      });
-    } else if (e.type === 'snapshot') {
-      events.push({
-        t, type: 'snapshot',
-        message: 'Holder snapshot taken',
-        detail: '20 wallets indexed. Total weighted balance: 1.28M $ABANK-days.',
-      });
-    }
-  }
-
-  const insertEvent = db.prepare(
-    `INSERT INTO agent_events (id, type, symbol, side, price, size, pnl, message, detail, metadata, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  );
-  for (const ev of events) {
-    insertEvent.run(
-      crypto.randomUUID(),
-      ev.type,
-      ev.symbol ?? null,
-      ev.side ?? null,
-      ev.price ?? null,
-      ev.size ?? null,
-      ev.pnl ?? null,
-      ev.message,
-      ev.detail ?? null,
-      null,
-      new Date(ev.t).toISOString(),
-    );
-  }
-
   // Admin key
   db.prepare('INSERT OR IGNORE INTO admin_keys (key) VALUES (?)').run('abank-admin-dev-key');
 
@@ -222,13 +103,11 @@ function run() {
     .run(totalDist, holderCount, nowStr, weekAgo);
 
   closeDb();
-  const eventCount = (db.prepare('SELECT COUNT(*) as c FROM agent_events').get() as any).c;
-  console.log(`✅ Database seeded!`);
-  console.log(`   - ${HOLDERS.length} holders`);
-  console.log(`   - 30 days of snapshots`);
-  console.log(`   - 3 distributions totaling $${totalDist}`);
-  console.log(`   - ${eventCount} agent activity events`);
-  console.log(`   - Admin key: abank-admin-dev-key`);
+  console.log(`Database seeded`);
+  console.log(`  - ${HOLDERS.length} holders`);
+  console.log(`  - 30 days of snapshots`);
+  console.log(`  - 3 distributions totaling $${totalDist}`);
+  console.log(`  - Admin key: abank-admin-dev-key`);
 }
 
 run();

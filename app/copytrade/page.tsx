@@ -350,7 +350,6 @@ export default function CopyTradePage() {
           <div className="hidden md:flex items-center gap-8 text-[13px] font-medium text-[#888]">
             <a href="/" className="hover:text-[#171717] transition-colors">Home</a>
             <a href="/copytrade" className="text-[#171717]">Copytrade</a>
-            <a href="/activity" className="hover:text-[#171717] transition-colors">Activity</a>
             <a href="/dashboard" className="hover:text-[#171717] transition-colors">Dashboard</a>
           </div>
           <MagBtn href="/dashboard" className="btn-primary inline-flex items-center gap-2 text-[12.5px] px-4 py-1.5">

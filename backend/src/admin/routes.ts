@@ -6,8 +6,8 @@ export function createAdminRouter() {
   const router = Router();
   router.use(adminAuth);
 
-  router.post('/snapshot', (_req: Request, res: Response) => {
-    try { res.json({ success: true, data: svc.snapshotHolders() }); }
+  router.post('/snapshot', async (_req: Request, res: Response) => {
+    try { res.json({ success: true, data: await svc.snapshotHolders() }); }
     catch (e: any) { res.status(500).json({ success: false, error: e.message }); }
   });
 

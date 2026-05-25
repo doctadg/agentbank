@@ -1,14 +1,48 @@
 import { getDb } from '../db';
 import crypto from 'crypto';
+import { config } from '../config';
+import { getAllHolders } from '../holder/helius';
 
-/** Snapshot holder balances (mock for now — swap in real Solana RPC) */
-export function snapshotHolders() {
+/**
+ * Snapshot today's holder balances.
+ * - If ABANK_MINT env is set, reads real holders from Helius.
+ * - Otherwise, falls back to the seeded mock holders (initial run) or
+ *   slightly varies existing holders (subsequent runs).
+ */
+export async function snapshotHolders() {
   const db = getDb();
   const today = new Date().toISOString().split('T')[0];
 
-  // Get existing holders from previous snapshots
+  // ─── Real mode: Helius ─────────────────────────────
+  if (config.abankMint) {
+    const holders = await getAllHolders(config.abankMint);
+    const insert = db.prepare(
+      'INSERT OR IGNORE INTO holder_snapshots (id, public_key, balance, snapshot_date) VALUES (?, ?, ?, ?)',
+    );
+    const tx = db.transaction((rows: typeof holders) => {
+      for (const h of rows) insert.run(crypto.randomUUID(), h.owner, h.balance, today);
+    });
+    tx(holders);
+
+    const totalBalance = holders.reduce((s, h) => s + h.balance, 0);
+    const now = new Date().toISOString();
+    db.prepare(
+      'UPDATE vault_state SET total_holders = ?, last_snapshot_at = ?, updated_at = ? WHERE id = 1',
+    ).run(holders.length, now, now);
+
+    return {
+      date: today,
+      holdersSnapshotted: holders.length,
+      totalBalance,
+      holderCount: holders.length,
+      source: 'helius',
+      mint: config.abankMint,
+    };
+  }
+
+  // ─── Mock mode: seeded list + variance ─────────────
   const existing = db.prepare(
-    "SELECT DISTINCT public_key FROM holder_snapshots"
+    'SELECT DISTINCT public_key FROM holder_snapshots',
   ).all() as { public_key: string }[];
 
   let count = 0;
@@ -70,7 +104,7 @@ export function snapshotHolders() {
 
   const totalBalance = (db.prepare("SELECT COALESCE(SUM(balance), 0) as t FROM holder_snapshots WHERE snapshot_date = ?").get(today) as any).t;
 
-  return { date: today, holdersSnapshotted: count, totalBalance, holderCount };
+  return { date: today, holdersSnapshotted: count, totalBalance, holderCount, source: 'mock' };
 }
 
 /** Distribute rewards proportional to holding_days * avg_balance */

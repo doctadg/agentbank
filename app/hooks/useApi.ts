@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 const API_BASE = "/api/backend";
 
-// ─── Generic fetch helper ──────────────────────────────
 async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json", ...opts?.headers },
@@ -17,297 +16,115 @@ async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
   return res.json();
 }
 
+function usePolled<T>(fetcher: () => Promise<T>, deps: React.DependencyList, refreshMs: number) {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = useCallback(async () => {
+    try {
+      const d = await fetcher();
+      setData(d);
+      setError(null);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+
+  useEffect(() => {
+    run();
+    const iv = setInterval(run, refreshMs);
+    return () => clearInterval(iv);
+  }, [run, refreshMs]);
+
+  return { data, loading, error, refetch: run };
+}
+
 // ─── Types ─────────────────────────────────────────────
-export interface Position {
-  symbol: string;
-  side: string;
-  size: number;
-  entryPrice: number;
-  markPrice: number;
-  unrealizedPnL: number;
-  leverage: number;
-  marginUsed: number;
+export interface VaultStats {
+  totalDistributed: number;
+  totalHolders: number;
+  totalSupply: number;
+  lastSnapshotAt: string | null;
+  lastDistributionAt: string | null;
 }
 
-export interface Trade {
-  id: number;
-  symbol: string;
-  side: string;
-  size: number;
-  price: number;
-  pnl: number;
-  timestamp: string;
-}
-
-export interface PortfolioData {
-  totalValue: number;
-  availableBalance: number;
-  usedBalance: number;
-  dailyPnL: number;
-  unrealizedPnL: number;
-  positionCount: number;
-  positions: Position[];
-}
-
-export interface MarketPrices {
-  [symbol: string]: number;
-}
-
-export interface SystemStatus {
-  status: string;
-  uptime: number;
-  version: string;
-  environment: string;
-}
-
-// ─── Hook: Portfolio ───────────────────────────────────
-export function usePortfolio(refreshMs = 5000) {
-  const [data, setData] = useState<PortfolioData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetch_ = useCallback(async () => {
-    try {
-      const res = await apiFetch<{ success: boolean; portfolio: PortfolioData }>("/portfolio");
-      setData(res.portfolio);
-      setError(null);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetch_();
-    const iv = setInterval(fetch_, refreshMs);
-    return () => clearInterval(iv);
-  }, [fetch_, refreshMs]);
-
-  return { data, loading, error, refetch: fetch_ };
-}
-
-// ─── Hook: Positions ───────────────────────────────────
-export function usePositions(refreshMs = 5000) {
-  const [positions, setPositions] = useState<Position[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetch_ = useCallback(async () => {
-    try {
-      const res = await apiFetch<{ success: boolean; positions: Position[] }>("/portfolio/positions");
-      setPositions(res.positions);
-      setError(null);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetch_();
-    const iv = setInterval(fetch_, refreshMs);
-    return () => clearInterval(iv);
-  }, [fetch_, refreshMs]);
-
-  return { positions, loading, error, refetch: fetch_ };
-}
-
-// ─── Hook: Trades ──────────────────────────────────────
-export function useTrades(limit = 50, refreshMs = 10000) {
-  const [trades, setTrades] = useState<Trade[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetch_ = useCallback(async () => {
-    try {
-      const res = await apiFetch<{ success: boolean; trades: Trade[] }>(`/portfolio/trades?limit=${limit}`);
-      setTrades(res.trades);
-      setError(null);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [limit]);
-
-  useEffect(() => {
-    fetch_();
-    const iv = setInterval(fetch_, refreshMs);
-    return () => clearInterval(iv);
-  }, [fetch_, refreshMs]);
-
-  return { trades, loading, error, refetch: fetch_ };
-}
-
-// ─── Hook: Market Prices ───────────────────────────────
-export function useMarketPrices(refreshMs = 3000) {
-  const [prices, setPrices] = useState<MarketPrices>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetch_ = useCallback(async () => {
-    try {
-      const res = await apiFetch<{ success: boolean; prices: MarketPrices }>("/market/prices");
-      setPrices(res.prices);
-      setError(null);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetch_();
-    const iv = setInterval(fetch_, refreshMs);
-    return () => clearInterval(iv);
-  }, [fetch_, refreshMs]);
-
-  return { prices, loading, error, refetch: fetch_ };
-}
-
-// ─── Hook: System Status ───────────────────────────────
-export function useSystemStatus(refreshMs = 15000) {
-  const [status, setStatus] = useState<SystemStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetch_ = useCallback(async () => {
-    try {
-      const res = await apiFetch<{ success: boolean; system: SystemStatus }>("/system/status");
-      setStatus(res.system);
-      setError(null);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetch_();
-    const iv = setInterval(fetch_, refreshMs);
-    return () => clearInterval(iv);
-  }, [fetch_, refreshMs]);
-
-  return { status, loading, error, refetch: fetch_ };
-}
-
-// ─── Agent activity ────────────────────────────────────
-export type AgentEventType =
-  | "trade_open" | "trade_close" | "signal" | "reasoning" | "distribution" | "snapshot" | "system";
-
-export interface AgentEvent {
+export interface Distribution {
   id: string;
-  type: AgentEventType;
-  symbol: string | null;
-  side: "long" | "short" | null;
-  price: number | null;
-  size: number | null;
-  pnl: number | null;
-  message: string;
-  detail: string | null;
-  metadata: string | null;
+  total_amount: number;
+  holder_count: number;
+  notes: string | null;
   created_at: string;
 }
 
-export interface AgentActivityStats {
-  total: number;
-  last24h: number;
-  latestAt: string | null;
-  byType: Partial<Record<AgentEventType, number>>;
+export interface LeaderboardEntry {
+  rank: number;
+  publicKey: string;
+  balance: number;
+  lastSeen: string;
 }
 
-export function useAgentActivity(types: AgentEventType[] = [], limit = 50, refreshMs = 5000) {
-  const [events, setEvents] = useState<AgentEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const typesKey = types.join(",");
-
-  const fetch_ = useCallback(async () => {
-    try {
-      const qs = new URLSearchParams();
-      qs.set("limit", String(limit));
-      if (typesKey) qs.set("types", typesKey);
-      const res = await apiFetch<{ success: boolean; data: { events: AgentEvent[] } }>(`/agent/activity?${qs}`);
-      setEvents(res.data.events);
-      setError(null);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [typesKey, limit]);
-
-  useEffect(() => {
-    fetch_();
-    const iv = setInterval(fetch_, refreshMs);
-    return () => clearInterval(iv);
-  }, [fetch_, refreshMs]);
-
-  return { events, loading, error, refetch: fetch_ };
+export interface HolderPosition {
+  publicKey: string;
+  balance: number;
+  holdingSince: string;
+  holdingDays: number;
+  avgBalance: number;
+  totalRewards: number;
 }
 
-export function useAgentActivityStats(refreshMs = 10000) {
-  const [stats, setStats] = useState<AgentActivityStats | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetch_ = useCallback(async () => {
-    try {
-      const res = await apiFetch<{ success: boolean; data: AgentActivityStats }>("/agent/activity/stats");
-      setStats(res.data);
-      setError(null);
-    } catch (e: any) {
-      setError(e.message);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetch_();
-    const iv = setInterval(fetch_, refreshMs);
-    return () => clearInterval(iv);
-  }, [fetch_, refreshMs]);
-
-  return { stats, error, refetch: fetch_ };
+// ─── Vault stats (holders, total distributed, supply) ──
+export function useVaultStats(refreshMs = 30_000) {
+  const { data, loading, error, refetch } = usePolled<VaultStats>(
+    async () => {
+      const r = await apiFetch<{ success: boolean; data: VaultStats }>("/vault/stats");
+      return r.data;
+    },
+    [],
+    refreshMs,
+  );
+  return { stats: data, loading, error, refetch };
 }
 
-// ─── Hook: WebSocket for real-time updates ─────────────
-export function useWebSocket() {
-  const [connected, setConnected] = useState(false);
-  const [lastMessage, setLastMessage] = useState<any>(null);
-  const wsRef = useRef<WebSocket | null>(null);
+// ─── Distribution history ──────────────────────────────
+export function useDistributions(refreshMs = 60_000) {
+  const { data, loading, error, refetch } = usePolled<Distribution[]>(
+    async () => {
+      const r = await apiFetch<{ success: boolean; data: Distribution[] }>("/vault/distributions");
+      return r.data;
+    },
+    [],
+    refreshMs,
+  );
+  return { distributions: data ?? [], loading, error, refetch };
+}
 
-  useEffect(() => {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.hostname}:4000/ws`;
+// ─── Holder leaderboard ────────────────────────────────
+export function useLeaderboard(refreshMs = 60_000) {
+  const { data, loading, error, refetch } = usePolled<LeaderboardEntry[]>(
+    async () => {
+      const r = await apiFetch<{ success: boolean; data: LeaderboardEntry[] }>("/holder/leaderboard");
+      return r.data;
+    },
+    [],
+    refreshMs,
+  );
+  return { leaderboard: data ?? [], loading, error, refetch };
+}
 
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => setConnected(true);
-    ws.onclose = () => setConnected(false);
-    ws.onerror = () => setConnected(false);
-    ws.onmessage = (event) => {
-      try {
-        setLastMessage(JSON.parse(event.data));
-      } catch {
-        setLastMessage(event.data);
-      }
-    };
-
-    return () => {
-      ws.close();
-      wsRef.current = null;
-    };
-  }, []);
-
-  const send = useCallback((data: any) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(data));
-    }
-  }, []);
-
-  return { connected, lastMessage, send };
+// ─── Specific holder ───────────────────────────────────
+export function useHolderPosition(publicKey: string | null, refreshMs = 60_000) {
+  const { data, loading, error, refetch } = usePolled<HolderPosition | null>(
+    async () => {
+      if (!publicKey) return null;
+      const r = await apiFetch<{ success: boolean; data: HolderPosition }>(`/holder/${publicKey}/position`);
+      return r.data;
+    },
+    [publicKey],
+    refreshMs,
+  );
+  return { position: data, loading, error, refetch };
 }
