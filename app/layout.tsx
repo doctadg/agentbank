@@ -3,10 +3,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "AgentBank — AI Trading Vault",
-  description: "Stake. Earn. Repeat. The first tokenized AI trading vault on Solana.",
+  description: "Hold $ABANK. Earn daily from AI trading. The first tokenized AI trading vault on Solana.",
   openGraph: {
     title: "AgentBank — AI Trading Vault",
-    description: "Stake $ABANK. Earn daily from AI trading. No complexity.",
+    description: "Hold $ABANK. Earn daily from AI trading. No staking, no lock-up.",
     type: "website",
   },
 };

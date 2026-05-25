@@ -190,9 +190,9 @@ export default function Dashboard() {
           </a>
           <div className="hidden md:flex items-center gap-7 text-[13px] font-medium text-[#999]">
             <a href="/" className="hover:text-[#171717] transition-colors">Home</a>
+            <a href="/copytrade" className="hover:text-[#171717] transition-colors">Copytrade</a>
             <a href="/activity" className="hover:text-[#171717] transition-colors">Activity</a>
             <a href="/dashboard" className="text-[#171717]">Dashboard</a>
-            <a href="/stake" className="hover:text-[#171717] transition-colors">Stake</a>
           </div>
           <MagBtn href="#" className="inline-flex items-center gap-2 text-[13px] px-5 py-2 rounded-full bg-[#171717] text-white font-medium hover:bg-black transition-colors">
             <StatusDot status={status?.status || "loading"} />
