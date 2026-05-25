@@ -6,10 +6,10 @@ import { motion, useSpring, useMotionValue, useScroll, useTransform } from "fram
 import Lenis from "lenis";
 
 const STEPS = [
-  { num: "01", title: "Get the Token", desc: "Buy $ABANK on pump.fun or any Solana DEX.", icon: "🪙" },
-  { num: "02", title: "Hold It", desc: "Keep $ABANK in your wallet. No staking, no locking, no risk.", icon: "🤝" },
-  { num: "03", title: "AI Trades", desc: "Our autonomous agent executes on Hyperliquid 24/7.", icon: "⚡" },
-  { num: "04", title: "Earn", desc: "100% of trading profits go to holders. The longer you hold, the more you earn.", icon: "💰" },
+  { num: "01", title: "Get the Token", desc: "Buy $ABANK on pump.fun or any Solana DEX." },
+  { num: "02", title: "Hold It", desc: "Keep $ABANK in your wallet. No staking, no locking, no risk." },
+  { num: "03", title: "AI Trades", desc: "Our autonomous agent executes on Hyperliquid 24/7." },
+  { num: "04", title: "Earn", desc: "100% of trading profits go to holders. The longer you hold, the more you earn." },
 ];
 
 const ease = [0.16, 1, 0.3, 1];
@@ -182,8 +182,7 @@ export default function Home() {
                   <div className="flex-1 rounded-2xl p-8 bg-white/60 backdrop-blur-sm group hover:bg-white/80 transition-all duration-500"
                     style={{ boxShadow: "0px 0px 0px 1px rgba(0,0,0,0.04), 0 4px 24px rgba(0,0,0,0.02)" }}>
                     <div className="flex items-center gap-3 mb-3">
-                      <span className="text-[28px]">{s.icon}</span>
-                      <span className="number-mono text-[11px] text-[#999] font-medium">{s.num}</span>
+                      <span className="w-7 h-7 rounded-md bg-[#171717] flex items-center justify-center text-[#00ff88] text-[10px] font-bold number-mono">{s.num}</span>
                     </div>
                     <h3 className="text-[22px] font-semibold mb-2 tracking-tight">{s.title}</h3>
                     <p className="text-[15px] text-[#4d4d4d] leading-relaxed">{s.desc}</p>
@@ -202,40 +201,50 @@ export default function Home() {
         </div>
       </section>
 
-      {/* EARN — dark section, center */}
+      {/* EARN — dark section, offset layout */}
       <section id="earn" className="relative py-28 px-6 bg-[#171717] overflow-hidden">
         <div className="absolute inset-0 opacity-[0.03]"
           style={{ backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
-        <motion.div className="absolute w-[400px] h-[400px] rounded-full bg-[#00ff88]/[0.04] blur-[120px]"
-          animate={{ x: [0, 50, 0], y: [0, -30, 0] }} transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          style={{ top: "10%", right: "5%" }} />
-        <div className="relative max-w-[720px] mx-auto text-center text-white">
-          <Fade><p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#00ff88] mb-4">100% to Holders</p></Fade>
-          <Fade delay={0.1}>
-            <h2 className="text-[36px] sm:text-[56px] font-semibold heading-display mb-6" style={{ lineHeight: 1.05 }}>
-              Every cent of profit<br />goes to you
-            </h2>
-          </Fade>
-          <Fade delay={0.2}>
-            <p className="text-[17px] text-white/40 max-w-[480px] mx-auto mb-12 leading-relaxed">
-              There are no hidden fees eating into your returns. 100% of the agent&apos;s trading profits are distributed to $ABANK holders based on holding duration.
-            </p>
-          </Fade>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { value: "100%", label: "Profits to Holders", desc: "Zero taken from trading returns" },
-              { value: "∞", label: "Hold Duration", desc: "The longer you hold, the more you earn" },
-              { value: "0", label: "Lock Period", desc: "Your tokens, your wallet, always" },
-            ].map((item, i) => (
-              <Fade key={item.label} delay={0.15 + i * 0.1}>
-                <motion.div className="rounded-xl p-6 bg-white/[0.04] border border-white/[0.06] hover:border-[#00ff88]/20 transition-colors duration-500"
-                  whileHover={{ y: -4 }} transition={{ type: "spring", stiffness: 300, damping: 20 }}>
-                  <p className="text-[36px] font-bold number-mono text-[#00ff88] mb-2" style={{ lineHeight: 1 }}>{item.value}</p>
-                  <p className="text-[15px] font-medium text-white/80 mb-1">{item.label}</p>
-                  <p className="text-[13px] text-white/25">{item.desc}</p>
-                </motion.div>
+        <div className="relative max-w-[1080px] mx-auto">
+          <div className="md:flex md:items-start md:gap-20">
+            <div className="md:w-1/3 mb-12 md:mb-0">
+              <Fade><p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#00ff88] mb-4">How You Earn</p></Fade>
+              <Fade delay={0.1}>
+                <h2 className="text-[32px] sm:text-[44px] font-semibold text-white heading-section mb-4" style={{ lineHeight: 1.05 }}>
+                  Your tokens.<br />Your profit.
+                </h2>
               </Fade>
-            ))}
+              <Fade delay={0.15}>
+                <p className="text-[15px] text-white/30 leading-relaxed">
+                  Buy $ABANK. Hold it. That&apos;s it. The agent trades, snapshots track your balance, and you get paid based on how long you held. No staking contract. No lock-up. No middleman.
+                </p>
+              </Fade>
+            </div>
+            <div className="md:w-2/3">
+              <div className="space-y-4">
+                {[
+                  { step: "1", title: "Hold $ABANK in any Solana wallet", desc: "Phantom, Solflare, Backpack — doesn't matter. Just hold." },
+                  { step: "2", title: "We snapshot on-chain balances", desc: "Periodic reads from the blockchain. Your holdings are tracked automatically." },
+                  { step: "3", title: "Profits distributed by holding weight", desc: "Reward = (your holding days x your avg balance) / (total weight) x distribution amount." },
+                ].map((item, i) => (
+                  <Fade key={item.step} delay={0.1 + i * 0.08} direction="right">
+                    <motion.div
+                      className="rounded-xl p-6 border border-white/[0.06] hover:border-[#00ff88]/20 transition-colors duration-500 flex items-start gap-5"
+                      whileHover={{ x: 4 }}
+                      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0">
+                        <span className="number-mono text-[14px] font-bold text-[#00ff88]">{item.step}</span>
+                      </div>
+                      <div>
+                        <p className="text-[16px] font-medium text-white/90 mb-1">{item.title}</p>
+                        <p className="text-[13px] text-white/30 leading-relaxed">{item.desc}</p>
+                      </div>
+                    </motion.div>
+                  </Fade>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
