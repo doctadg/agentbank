@@ -332,7 +332,7 @@ export function computeStats(address: string, fills: HLFill[], state: HLClearing
 // ─── Multi-trader combined hook ────────────────────────
 // NOTE: the `refreshMs` arg is accepted for backwards compat but ignored
 // (we now stream via WebSocket).
-export function useCopytrade(addresses: string[], _refreshMs?: number) {
+export function useCopytrade(addresses: readonly string[], _refreshMs?: number) {
   const traders = addresses.map((addr) => useHyperliquidTrader(addr)); // eslint-disable-line react-hooks/rules-of-hooks
 
   const stats = traders.map((t, i) => computeStats(addresses[i], t.fills, t.state));
