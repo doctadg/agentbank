@@ -160,9 +160,10 @@ function sizingCfg(): SizingConfig {
 }
 
 // Hyperliquid prefixes spot / prediction-market / vault tokens (e.g. "xyz:SPCX",
-// "@1234", "k", etc.) — we only mirror plain perpetual symbols (BTC, ETH, …).
+// "@1234"). Plain perp symbols are uppercase alnum, sometimes with a leading digit
+// (1000PEPE, 1MBONK). Exclude anything with non-alnum characters.
 function isSupportedCoin(coin: string): boolean {
-  return /^[A-Z][A-Z0-9]{0,9}$/.test(coin);
+  return /^[A-Z0-9][A-Z0-9]{0,11}$/.test(coin);
 }
 
 function handleNewFill(wallet: string, fill: HLFill) {
