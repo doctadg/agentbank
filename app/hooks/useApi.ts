@@ -91,6 +91,82 @@ export function useLeaderboard(refreshMs = 60_000) {
   return { leaderboard: data ?? [], loading, error, refetch };
 }
 
+// ─── Agent (paper copy-trading) ────────────────────────
+export interface AgentOpenPosition {
+  id: number;
+  coin: string;
+  side: "long" | "short";
+  sz: number;
+  entryPx: number;
+  markPx: number;
+  notional: number;
+  unrealizedPnl: number;
+  sourceWallet: string;
+}
+
+export interface AgentState {
+  startingEquity: number;
+  equity: number;
+  realizedPnl: number;
+  unrealizedPnl: number;
+  pnlPct: number;
+  openPositions: AgentOpenPosition[];
+  openPositionsCount: number;
+  paused: boolean;
+  followedCount: number;
+  tradeCount: number;
+  closedCount: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  lastTradeAt: number | null;
+}
+
+export interface AgentTrade {
+  id: number;
+  ts: number;
+  source_wallet: string;
+  source_tid: number;
+  coin: string;
+  action: "open_long" | "open_short" | "close_long" | "close_short" | "reduce_long" | "reduce_short";
+  source_px: number;
+  source_sz: number;
+  source_notional: number;
+  leader_acct_value: number;
+  leader_pct: number;
+  vault_acct_value: number;
+  mirror_sz: number;
+  mirror_notional: number;
+  mirror_px: number;
+  realized_pnl: number | null;
+  position_id: number | null;
+  notes: string | null;
+}
+
+export function useAgentState(refreshMs = 10_000) {
+  const { data, loading, error, refetch } = usePolled<AgentState>(
+    async () => {
+      const r = await apiFetch<{ success: boolean; data: AgentState }>("/agent/state");
+      return r.data;
+    },
+    [],
+    refreshMs,
+  );
+  return { state: data, loading, error, refetch };
+}
+
+export function useAgentTrades(limit = 50, refreshMs = 10_000) {
+  const { data, loading, error, refetch } = usePolled<AgentTrade[]>(
+    async () => {
+      const r = await apiFetch<{ success: boolean; data: AgentTrade[] }>(`/agent/trades?limit=${limit}`);
+      return r.data;
+    },
+    [limit],
+    refreshMs,
+  );
+  return { trades: data ?? [], loading, error, refetch };
+}
+
 // ─── Specific holder ───────────────────────────────────
 export function useHolderPosition(publicKey: string | null, refreshMs = 60_000) {
   const { data, loading, error, refetch } = usePolled<HolderPosition | null>(

@@ -15,6 +15,7 @@ import {
 } from "../hooks/useHyperliquid";
 
 import { FOLLOWED_TRADERS as FOLLOWED } from "../lib/followed-traders";
+import { useAgentState, useAgentTrades, type AgentTrade } from "../hooks/useApi";
 
 // ─── Helpers ───────────────────────────────────────────
 function fmtUSD(n: number, withSign = false, decimals = 0) {
@@ -321,13 +322,132 @@ function FillCard({ fill, trader, isNew }: { fill: HLFill; trader: string; isNew
   );
 }
 
+// ─── Agent strip ───────────────────────────────────────
+function AgentStrip() {
+  const { state, error } = useAgentState(8000);
+  const equity = state?.equity ?? state?.startingEquity ?? 0;
+  const profitable = (state?.realizedPnl ?? 0) + (state?.unrealizedPnl ?? 0) >= 0;
+  return (
+    <div
+      className="rounded-2xl overflow-hidden bg-gradient-to-br from-[#0a3d24] to-[#0a1a12] text-white relative border border-[#00ff88]/15"
+      style={{ boxShadow: "0 12px 48px rgba(0,255,136,0.1), inset 0 1px 0 rgba(255,255,255,0.04)" }}
+    >
+      <div className="flex items-center justify-between gap-2 px-6 py-3 border-b border-white/[0.06] relative">
+        <div className="flex items-center gap-2">
+          <span className="text-[10.5px] uppercase tracking-[0.14em] text-[#00ff88] font-semibold">AgentBank Vault</span>
+          <span className="text-[10.5px] text-white/30">· paper mode</span>
+        </div>
+        <span className="flex items-center gap-1.5">
+          <LivePulse color="#00ff88" size={6} />
+          <span className="text-[10px] uppercase tracking-[0.14em] text-white/40 font-medium">
+            {state?.paused ? "Paused" : `${state?.followedCount ?? 0} leaders`}
+          </span>
+        </span>
+      </div>
+      {error && (
+        <div className="px-6 py-2 text-[11px] text-amber-300/80 bg-amber-500/[0.04]">backend: {error}</div>
+      )}
+      <div className="grid grid-cols-2 lg:grid-cols-5 divide-x divide-y lg:divide-y-0 divide-white/[0.05] relative">
+        <div className="px-6 py-6">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-medium mb-2">Vault Equity</p>
+          <Tape value={equity} prefix="$" decimals={0} className="text-[26px] font-semibold tracking-tight text-white leading-none" />
+          <p className="text-[11px] text-white/35 mt-1.5 number-mono">
+            start ${(state?.startingEquity ?? 0).toLocaleString()}
+          </p>
+        </div>
+        <div className="px-6 py-6">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-medium mb-2">All-time PnL</p>
+          <p className={`number-mono text-[26px] font-semibold tracking-tight leading-none ${profitable ? "text-[#00ff88]" : "text-[#ff5566]"}`}>
+            {profitable ? "+" : "−"}{fmtUSD(Math.abs((state?.realizedPnl ?? 0) + (state?.unrealizedPnl ?? 0)), false, 0)}
+          </p>
+          <p className="text-[11px] text-white/35 mt-1.5 number-mono">{(state?.pnlPct ?? 0).toFixed(2)}%</p>
+        </div>
+        <div className="px-6 py-6">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-medium mb-2">Unrealized</p>
+          <p className={`number-mono text-[20px] font-semibold tracking-tight leading-none ${(state?.unrealizedPnl ?? 0) >= 0 ? "text-[#00ff88]/90" : "text-[#ff5566]/90"}`}>
+            {(state?.unrealizedPnl ?? 0) >= 0 ? "+" : "−"}{fmtUSD(Math.abs(state?.unrealizedPnl ?? 0), false, 0)}
+          </p>
+          <p className="text-[11px] text-white/35 mt-1.5 number-mono">{state?.openPositionsCount ?? 0} open</p>
+        </div>
+        <div className="px-6 py-6">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-medium mb-2">Realized</p>
+          <p className={`number-mono text-[20px] font-semibold tracking-tight leading-none ${(state?.realizedPnl ?? 0) >= 0 ? "text-[#00ff88]/90" : "text-[#ff5566]/90"}`}>
+            {(state?.realizedPnl ?? 0) >= 0 ? "+" : "−"}{fmtUSD(Math.abs(state?.realizedPnl ?? 0), false, 0)}
+          </p>
+          <p className="text-[11px] text-white/35 mt-1.5 number-mono">{state?.closedCount ?? 0} closed</p>
+        </div>
+        <div className="px-6 py-6">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-medium mb-2">Win Rate</p>
+          <p className="number-mono text-[20px] font-semibold tracking-tight leading-none text-white">
+            {((state?.winRate ?? 0) * 100).toFixed(0)}%
+          </p>
+          <p className="text-[11px] text-white/35 mt-1.5 number-mono">
+            {state?.wins ?? 0}W / {state?.losses ?? 0}L · {state?.tradeCount ?? 0} fills
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Agent trade row ───────────────────────────────────
+function AgentTradeRow({ t, isNew }: { t: AgentTrade; isNew: boolean }) {
+  const isOpen = t.action.startsWith("open");
+  const side: "long" | "short" = t.action.includes("long") ? "long" : "short";
+  const sideColor = side === "long" ? "#0a8a4d" : "#c0392b";
+  const profitable = (t.realized_pnl ?? 0) >= 0;
+  useTick(1000);
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ type: "spring", stiffness: 260, damping: 26 }}
+      className="relative flex gap-4 group"
+    >
+      <div className="relative shrink-0 flex flex-col items-center">
+        <div className="relative z-10 w-9 h-9 rounded-full flex items-center justify-center ring-4 ring-[#f4f1ea]" style={{ background: sideColor, color: "white" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d={isOpen ? (side === "long" ? "M5 17l7-7 7 7M5 7h14" : "M5 7l7 7 7-7M5 17h14") : "M5 5l14 14M19 5L5 19"} />
+          </svg>
+          {isNew && <span className="absolute -inset-1 rounded-full ring-2 animate-ping" style={{ borderColor: sideColor }} />}
+        </div>
+        <div className="flex-1 w-px bg-gradient-to-b from-black/[0.06] via-black/[0.04] to-transparent mt-1 mb-2 min-h-[16px]" />
+      </div>
+      <div className="flex-1 mb-3 rounded-xl bg-white/55 border border-black/[0.05] px-4 py-3 hover:border-[#00ff88]/30 hover:bg-white/85 transition-all duration-300">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] px-1.5 py-0.5 rounded" style={{ color: sideColor, background: `${sideColor}1A` }}>
+              {t.action.replace("_", " ")}
+            </span>
+            <span className="text-[13px] font-semibold tracking-tight">{t.coin}</span>
+            <span className="text-[12px] text-[#999] number-mono">${fmtUSD(t.mirror_notional)} @ ${fmtNum(t.mirror_px, 4)}</span>
+          </div>
+          <span className="number-mono text-[11px] text-[#999] shrink-0">{fmtTimeAgo(t.ts)} ago</span>
+        </div>
+        <div className="flex items-center justify-between mt-1.5">
+          <a href={`https://app.hyperliquid.xyz/explorer/address/${t.source_wallet}`} target="_blank" rel="noreferrer" className="number-mono text-[10.5px] text-[#bbb] hover:text-[#666] transition-colors">
+            mirror of {t.source_wallet.slice(0, 6)}…{t.source_wallet.slice(-4)}
+          </a>
+          {t.realized_pnl !== null && (
+            <span className={`number-mono text-[12px] font-semibold ${profitable ? "text-[#0a8a4d]" : "text-[#c0392b]"}`}>
+              {profitable ? "+" : "−"}${fmtUSD(Math.abs(t.realized_pnl))}
+            </span>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 // ─── Page ──────────────────────────────────────────────
 export default function CopyTradePage() {
   const { stats, totals, combinedFills, combinedPositions, loading, error } = useCopytrade(FOLLOWED, 10000);
   const latestFillTid = combinedFills[0]?.fill.tid;
+  const { trades: agentTrades } = useAgentTrades(50, 8000);
 
   // tab state for bottom panel
-  const [tab, setTab] = useState<"fills" | "positions">("fills");
+  const [tab, setTab] = useState<"agent" | "fills" | "positions">("agent");
 
   return (
     <div className="min-h-screen bg-[#f4f1ea] text-[#171717]">
@@ -362,7 +482,10 @@ export default function CopyTradePage() {
             </div>
           </div>
 
-          <HeroStrip totals={totals} />
+          <AgentStrip />
+          <div className="mt-4">
+            <HeroStrip totals={totals} />
+          </div>
 
           {error && (
             <div className="mt-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-[13px] text-red-700">
@@ -394,7 +517,8 @@ export default function CopyTradePage() {
             <div className="flex items-center justify-between px-5 pt-4">
               <div className="flex gap-1">
                 {[
-                  { k: "fills" as const, label: "Live Fills", count: combinedFills.length },
+                  { k: "agent" as const, label: "Agent's Trades", count: agentTrades.length },
+                  { k: "fills" as const, label: "Leader Fills", count: combinedFills.length },
                   { k: "positions" as const, label: "Open Positions", count: combinedPositions.length },
                 ].map((t) => (
                   <button key={t.k} onClick={() => setTab(t.k)}
@@ -412,7 +536,22 @@ export default function CopyTradePage() {
               </div>
             </div>
 
-            {tab === "fills" ? (
+            {tab === "agent" ? (
+              <div className="p-5 pt-4">
+                {agentTrades.length === 0 ? (
+                  <div className="py-16 text-center text-[13px] text-[#999]">
+                    <p className="mb-1.5">Agent is online — no trades yet.</p>
+                    <p className="text-[11px] text-[#bbb]">Waiting for a followed leader to open or close a position…</p>
+                  </div>
+                ) : (
+                  <AnimatePresence initial={false}>
+                    {agentTrades.slice(0, 30).map((t) => (
+                      <AgentTradeRow key={t.id} t={t} isNew={t.id === agentTrades[0]?.id} />
+                    ))}
+                  </AnimatePresence>
+                )}
+              </div>
+            ) : tab === "fills" ? (
               <div className="p-5 pt-4">
                 {loading && combinedFills.length === 0 ? (
                   <div className="space-y-3">
