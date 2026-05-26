@@ -37,5 +37,17 @@ export const config = {
     minOrderUsd: parseFloat(process.env.AGENT_MIN_ORDER_USD || '25'),
     /** Set to '1' to disable mirroring (read-only mode). */
     paused: process.env.AGENT_PAUSED === '1',
+
+    // ── live execution ──
+    /** 'paper' (default, no real orders) | 'live' (real orders via HL). */
+    mode: (process.env.AGENT_MODE === 'live' ? 'live' : 'paper') as 'paper' | 'live',
+    /** Hyperliquid API wallet private key (0x...). Trade-only sub-key on the master. */
+    hlApiKey: process.env.HL_API_PRIVATE_KEY || '',
+    /** Hyperliquid master account (holds USDC; API wallet trades on its behalf). */
+    hlMaster: (process.env.HL_MASTER_ADDRESS || '').toLowerCase(),
+    /** Cap leverage applied to every live order. */
+    maxLeverage: parseInt(process.env.AGENT_MAX_LEVERAGE || '5', 10),
+    /** Use Hyperliquid testnet endpoints instead of mainnet (smoke testing). */
+    testnet: process.env.HL_TESTNET === '1',
   },
 };

@@ -20,8 +20,10 @@ import {
 import { HLFill, HLClearinghouseState } from './types';
 import { classifyFill, computeOpen, computeClose, realizedPnl, SizingConfig } from './sizing';
 import * as repo from './repo';
+import { isLiveEnabled, placeMarketOpen, placeMarketClose, getVaultAccountValue } from './hl-exec';
 
 const STARTING_EQUITY = config.agent.startingEquity;
+const LIVE = isLiveEnabled;
 
 // In-memory caches keyed by lowercased leader wallet.
 const leaderAccountValue = new Map<string, number>();
@@ -69,7 +71,7 @@ export async function startAgent() {
         if (maxTid > 0) repo.setCursor(wallet, maxTid, Date.now());
         return;
       }
-      for (const f of fills) handleNewFill(wallet, f);
+      for (const f of fills) handleNewFill(wallet, f).catch((e) => console.warn('[agent] handle fill failed:', e?.message ?? e));
     });
     ws.subscribe({ type: 'webData2', user: wallet });
     ws.subscribe({ type: 'userFills', user: wallet });
@@ -79,7 +81,13 @@ export async function startAgent() {
   // 3. Mark-to-market open positions every 15s and snapshot equity every 60s
   markInterval = setInterval(async () => {
     try { allMids = parseMids(await fetchAllMids()); } catch {}
+    if (LIVE()) {
+      try { _liveVaultEquity = await getVaultAccountValue(); } catch {}
+    }
   }, 15_000);
+  if (LIVE()) {
+    getVaultAccountValue().then((v) => { _liveVaultEquity = v; console.log(`[agent] LIVE mode — master equity $${v.toFixed(2)}`); }).catch((e) => console.warn('[agent] live equity probe failed:', e.message));
+  }
   snapshotInterval = setInterval(() => {
     try {
       const { realized, unrealized } = computeLiveStats();
@@ -108,6 +116,8 @@ export function getLiveState() {
     openPositions: positions,
     openPositionsCount: positions.length,
     paused: config.agent.paused,
+    mode: config.agent.mode,
+    live: LIVE(),
     followedCount: config.agent.followed.length,
     ...stats,
   };
@@ -146,7 +156,11 @@ async function seedLeader(wallet: string) {
   if (!cur) repo.setCursor(wallet, 0, Date.now());
 }
 
+// Cached live vault equity (refreshed by the mark-to-market loop in live mode).
+let _liveVaultEquity = 0;
+
 function vaultEquityNow(): number {
+  if (LIVE() && _liveVaultEquity > 0) return _liveVaultEquity;
   const { realized, unrealized } = computeLiveStats();
   return STARTING_EQUITY + realized + unrealized;
 }
@@ -166,7 +180,7 @@ function isSupportedCoin(coin: string): boolean {
   return /^[A-Z0-9][A-Z0-9]{0,11}$/.test(coin);
 }
 
-function handleNewFill(wallet: string, fill: HLFill) {
+async function handleNewFill(wallet: string, fill: HLFill): Promise<void> {
   if (config.agent.paused) return;
   if (!fill?.tid) return;
   if (repo.tradeExistsForTid(wallet, fill.tid)) return;
@@ -198,10 +212,37 @@ function handleNewFill(wallet: string, fill: HLFill) {
       repo.setCursor(wallet, fill.tid, fill.time);
       return;
     }
+
+    // LIVE: send real order, use the fill price as our paper entry record.
+    let liveNote: string | null = null;
+    let entryPx = dec.mirrorPx;
+    let mirrorSz = dec.mirrorSz;
+    if (LIVE()) {
+      const r = await placeMarketOpen({
+        coin: dec.coin, isBuy: cls.side === 'long',
+        notionalUsd: dec.mirrorNotional, leverage: config.agent.maxLeverage,
+      });
+      if (r.status === 'filled') {
+        entryPx = r.filledPx ?? entryPx; mirrorSz = r.filledSz ?? mirrorSz;
+        liveNote = `live fill cloid=${r.cloid?.slice(0,10)} oid=${r.oid}`;
+        console.log(`[agent.LIVE] OPEN ${cls.side.toUpperCase()} ${fill.coin} ${mirrorSz} @ $${entryPx} (${liveNote})`);
+      } else if (r.status === 'resting') {
+        // unusual for IOC, but if it happens, skip recording
+        repo.setCursor(wallet, fill.tid, fill.time);
+        console.warn(`[agent.LIVE] open returned resting (cancelled), skipping mirror`);
+        return;
+      } else {
+        // error — skip the mirror, log it, advance cursor
+        repo.setCursor(wallet, fill.tid, fill.time);
+        console.warn(`[agent.LIVE] open FAILED ${fill.coin} — ${r.error}`);
+        return;
+      }
+    }
+
     const positionId = repo.openPosition({
       wallet, coin: dec.coin, side: cls.side,
-      sz: dec.mirrorSz, entryPx: dec.mirrorPx,
-      notional: dec.mirrorNotional, openedAt: fill.time,
+      sz: mirrorSz, entryPx,
+      notional: mirrorSz * entryPx, openedAt: fill.time,
     });
     repo.recordTrade({
       ts: fill.time,
@@ -215,14 +256,14 @@ function handleNewFill(wallet: string, fill: HLFill) {
       leader_acct_value: leaderAv,
       leader_pct: dec.leaderPct,
       vault_acct_value: vaultEquityNow(),
-      mirror_sz: dec.mirrorSz,
-      mirror_notional: dec.mirrorNotional,
-      mirror_px: dec.mirrorPx,
+      mirror_sz: mirrorSz,
+      mirror_notional: mirrorSz * entryPx,
+      mirror_px: entryPx,
       realized_pnl: null,
       position_id: positionId,
-      notes: null,
+      notes: liveNote,
     });
-    console.log(`[agent] OPEN ${cls.side.toUpperCase()} ${fill.coin} $${dec.mirrorNotional.toFixed(0)} (mirror of ${shortAddr(wallet)} @ ${(dec.leaderPct*100).toFixed(2)}%)`);
+    if (!LIVE()) console.log(`[agent] OPEN ${cls.side.toUpperCase()} ${fill.coin} $${dec.mirrorNotional.toFixed(0)} (mirror of ${shortAddr(wallet)} @ ${(dec.leaderPct*100).toFixed(2)}%)`);
   } else {
     // Close: find matching open paper position
     const pos = repo.findOpenPosition(wallet, fill.coin, cls.side);
@@ -237,8 +278,21 @@ function handleNewFill(wallet: string, fill: HLFill) {
       repo.setCursor(wallet, fill.tid, fill.time);
       return;
     }
-    const closedSz = pos.sz * dec.closeFraction;
-    const closePx = parseFloat(fill.px);
+    let closedSz = pos.sz * dec.closeFraction;
+    let closePx = parseFloat(fill.px);
+    let liveCloseNote: string | null = null;
+    if (LIVE()) {
+      const r = await placeMarketClose({ coin: fill.coin, fraction: dec.closeFraction });
+      if (r.status === 'filled') {
+        closedSz = r.filledSz ?? closedSz;
+        closePx = r.filledPx ?? closePx;
+        liveCloseNote = `live close cloid=${r.cloid?.slice(0,10)} oid=${r.oid}`;
+        console.log(`[agent.LIVE] CLOSE ${fill.coin} ${closedSz} @ $${closePx} (${liveCloseNote})`);
+      } else {
+        console.warn(`[agent.LIVE] close FAILED ${fill.coin} — ${r.error}`);
+        // fall through and still record paper-side close so accounting stays consistent
+      }
+    }
     const pnl = realizedPnl(cls.side, pos.entry_px, closePx, closedSz);
     repo.reducePosition(pos.id, closedSz, closePx, pnl, fill.time);
     repo.recordTrade({
@@ -258,9 +312,9 @@ function handleNewFill(wallet: string, fill: HLFill) {
       mirror_px: closePx,
       realized_pnl: pnl,
       position_id: pos.id,
-      notes: dec.closeFraction < 0.99 ? `reduce ${(dec.closeFraction*100).toFixed(0)}%` : null,
+      notes: liveCloseNote ?? (dec.closeFraction < 0.99 ? `reduce ${(dec.closeFraction*100).toFixed(0)}%` : null),
     });
-    console.log(`[agent] ${dec.action.toUpperCase()} ${fill.coin} ${pnl>=0?'+':''}$${pnl.toFixed(2)}`);
+    if (!LIVE()) console.log(`[agent] ${dec.action.toUpperCase()} ${fill.coin} ${pnl>=0?'+':''}$${pnl.toFixed(2)}`);
   }
 
   repo.setCursor(wallet, fill.tid, fill.time);

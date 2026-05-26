@@ -19,7 +19,9 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "tweetnacl": "^1.0.3",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "@nktkas/hyperliquid": "^0.27.0",
+    "viem": "^2.21.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.8",
