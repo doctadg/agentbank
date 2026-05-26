@@ -5,11 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import Lenis from "lenis";
 import { useCopytrade, truncateAddress, parseFillSide } from "./hooks/useHyperliquid";
-
-const FOLLOWED_TRADERS = [
-  "0x8def9f50456c6c4e37fa5d3d57f108ed23992dae",
-  "0x152e41f0b83e6cad4b5dc730c1d6279b7d67c9dc",
-];
+import { FOLLOWED_TRADERS } from "./lib/followed-traders";
 
 const Icon = ({ d, size = 22, fill = "none" }: { d: string; size?: number; fill?: string }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke="currentColor"
@@ -100,7 +96,7 @@ function FollowingGlimpse() {
             </Fade>
             <Fade delay={0.1}>
               <h2 className="text-[32px] sm:text-[44px] font-semibold heading-section text-white mb-3 tracking-[-0.02em]">
-                Two top-performing Hyperliquid wallets.
+                Eight top-performing Hyperliquid wallets.
               </h2>
             </Fade>
             <Fade delay={0.15}>
@@ -129,59 +125,52 @@ function FollowingGlimpse() {
           </Fade>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
           {stats.map((s, i) => {
             const profit = s.pnl24h >= 0;
             const last = s.lastFill;
             const side = last ? parseFillSide(last) : null;
             return (
-              <Fade key={s.address} delay={0.1 + i * 0.06}>
+              <Fade key={s.address} delay={0.05 + i * 0.04}>
                 <a
                   href="/copytrade"
-                  className="block group relative rounded-xl bg-white/[0.025] border border-white/[0.06] p-6 hover:border-white/[0.14] hover:bg-white/[0.035] transition-colors duration-300"
+                  className="block group relative rounded-xl bg-white/[0.025] border border-white/[0.06] p-4 hover:border-white/[0.14] hover:bg-white/[0.035] transition-colors duration-300"
                 >
-                  <div className="flex items-center justify-between mb-5">
-                    <div className="flex items-center gap-2.5">
-                      <span className="w-8 h-8 rounded-full bg-white/[0.06] flex items-center justify-center text-[11px] font-semibold number-mono text-white/70">
+                  <div className="flex items-center justify-between mb-3.5">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-white/[0.06] flex items-center justify-center text-[9.5px] font-semibold number-mono text-white/70">
                         T{i + 1}
                       </span>
-                      <span className="number-mono text-[12.5px] font-medium text-white/80">{truncateAddress(s.address)}</span>
+                      <span className="number-mono text-[11.5px] font-medium text-white/80">{truncateAddress(s.address, 5, 4)}</span>
                     </div>
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#00ff88]" />
-                      <span className="text-[10px] uppercase tracking-[0.14em] text-white/40 font-medium">Live</span>
-                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#00ff88]" />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4 mb-5">
+                  <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
-                      <p className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-medium mb-1.5">Account</p>
-                      <p className="number-mono text-[15px] font-semibold text-white">
+                      <p className="text-[9.5px] uppercase tracking-[0.1em] text-white/35 font-medium mb-1">Account</p>
+                      <p className="number-mono text-[13px] font-semibold text-white">
                         {s.accountValue >= 1e6 ? `$${(s.accountValue / 1e6).toFixed(1)}M` : s.accountValue >= 1e3 ? `$${Math.round(s.accountValue / 1e3)}K` : `$${s.accountValue.toFixed(0)}`}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-medium mb-1.5">24h PnL</p>
-                      <p className={`number-mono text-[15px] font-semibold ${profit ? "text-[#00ff88]" : "text-[#ff5566]"}`}>
+                      <p className="text-[9.5px] uppercase tracking-[0.1em] text-white/35 font-medium mb-1">24h PnL</p>
+                      <p className={`number-mono text-[13px] font-semibold ${profit ? "text-[#00ff88]" : "text-[#ff5566]"}`}>
                         {s.pnl24h === 0 && loading ? "…" : `${profit ? "+" : "−"}$${Math.abs(s.pnl24h) >= 1e3 ? `${(Math.abs(s.pnl24h) / 1e3).toFixed(1)}K` : Math.abs(s.pnl24h).toFixed(0)}`}
                       </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-medium mb-1.5">Open</p>
-                      <p className="number-mono text-[15px] font-semibold text-white">{s.positions.length}</p>
                     </div>
                   </div>
 
                   {last && (
-                    <div className="pt-4 border-t border-white/[0.06] flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`text-[10px] font-semibold uppercase tracking-[0.08em] px-1.5 py-0.5 rounded ${
+                    <div className="pt-3 border-t border-white/[0.05] flex items-center justify-between gap-2 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <span className={`text-[9px] font-semibold uppercase tracking-[0.06em] px-1 py-0.5 rounded shrink-0 ${
                           side === "long" || side === "buy" ? "text-[#00ff88] bg-[#00ff88]/10" : "text-[#ff5566] bg-[#ff5566]/10"
-                        }`}>{last.dir}</span>
-                        <span className="text-[12.5px] font-medium number-mono text-white/90">{last.coin}</span>
+                        }`}>{last.dir.split(" ")[0]}</span>
+                        <span className="text-[11.5px] font-medium number-mono text-white/90 truncate">{last.coin}</span>
                       </div>
-                      <span className="number-mono text-[10.5px] text-white/40 shrink-0">
-                        {Math.max(0, Math.floor((Date.now() - last.time) / 1000))}s ago
+                      <span className="number-mono text-[10px] text-white/40 shrink-0">
+                        {(() => { const s2 = Math.max(0, Math.floor((Date.now() - last.time) / 1000)); if (s2 < 60) return `${s2}s`; if (s2 < 3600) return `${Math.floor(s2/60)}m`; if (s2 < 86400) return `${Math.floor(s2/3600)}h`; return `${Math.floor(s2/86400)}d`; })()}
                       </span>
                     </div>
                   )}

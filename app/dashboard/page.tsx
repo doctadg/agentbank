@@ -9,11 +9,7 @@ import {
   type TraderStats,
 } from "../hooks/useHyperliquid";
 import { useVaultStats, useLeaderboard } from "../hooks/useApi";
-
-const FOLLOWED = [
-  "0x8def9f50456c6c4e37fa5d3d57f108ed23992dae",
-  "0x152e41f0b83e6cad4b5dc730c1d6279b7d67c9dc",
-];
+import { FOLLOWED_TRADERS as FOLLOWED } from "../lib/followed-traders";
 
 // ─── Helpers ───────────────────────────────────────────
 function fmtUSD(n: number, withSign = false, decimals = 0) {
@@ -56,38 +52,30 @@ function LivePulse({ color = "#00ff88", size = 6 }: { color?: string; size?: num
   );
 }
 
-// ─── Trader summary card ───────────────────────────────
-function TraderSummary({ stats }: { stats: TraderStats }) {
+// ─── Trader summary row (compact, dashboard sidebar) ──
+function TraderRow({ stats, idx }: { stats: TraderStats; idx: number }) {
   const profitable = stats.pnl24h >= 0;
   return (
-    <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-5">
-      <div className="flex items-center justify-between mb-4">
-        <a
-          href={hyperliquidExplorer(stats.address)}
-          target="_blank" rel="noreferrer"
-          className="text-[12.5px] font-medium number-mono text-white/80 hover:text-white transition-colors"
-        >
-          {truncateAddress(stats.address)}
-        </a>
-        <LivePulse />
+    <a
+      href={hyperliquidExplorer(stats.address)}
+      target="_blank" rel="noreferrer"
+      className="group flex items-center gap-3 py-2.5 border-t border-white/[0.05] hover:bg-white/[0.02] transition-colors px-2 -mx-2 rounded"
+    >
+      <span className="w-6 h-6 rounded-full bg-white/[0.05] flex items-center justify-center text-[9.5px] font-semibold number-mono text-white/60 shrink-0">
+        T{idx + 1}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-[11.5px] font-medium number-mono text-white/85 truncate group-hover:text-white transition-colors">
+          {truncateAddress(stats.address, 5, 4)}
+        </p>
+        <p className="text-[10px] text-white/40 number-mono mt-0.5">
+          {fmtUSD(stats.accountValue)} · {stats.positions.length} open
+        </p>
       </div>
-      <div className="space-y-2.5">
-        <div className="flex justify-between items-baseline">
-          <span className="text-[11px] text-white/40 uppercase tracking-[0.1em]">Account</span>
-          <span className="number-mono text-[14px] font-semibold text-white">{fmtUSD(stats.accountValue)}</span>
-        </div>
-        <div className="flex justify-between items-baseline">
-          <span className="text-[11px] text-white/40 uppercase tracking-[0.1em]">24h PnL</span>
-          <span className={`number-mono text-[14px] font-semibold ${profitable ? "text-[#00ff88]" : "text-[#ff5566]"}`}>
-            {profitable ? "+" : "−"}{fmtUSD(Math.abs(stats.pnl24h))}
-          </span>
-        </div>
-        <div className="flex justify-between items-baseline">
-          <span className="text-[11px] text-white/40 uppercase tracking-[0.1em]">Open</span>
-          <span className="number-mono text-[14px] font-semibold text-white">{stats.positions.length}</span>
-        </div>
-      </div>
-    </div>
+      <span className={`number-mono text-[12px] font-semibold shrink-0 ${profitable ? "text-[#00ff88]" : "text-[#ff5566]"}`}>
+        {profitable ? "+" : "−"}{fmtUSD(Math.abs(stats.pnl24h))}
+      </span>
+    </a>
   );
 }
 
@@ -218,15 +206,17 @@ export default function Dashboard() {
             {/* Dark panel: followed traders */}
             <div className="rounded-2xl bg-[#171717] text-white p-5"
               style={{ boxShadow: "0 12px 48px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.04)" }}>
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-white/50 font-medium">Mirroring</p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-white/50 font-medium">
+                  Mirroring <span className="text-white/35">· {traderStats.length}</span>
+                </p>
                 <a href="/copytrade" className="text-[11px] text-white/60 hover:text-white transition-colors inline-flex items-center gap-1">
                   Live page
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
                 </a>
               </div>
-              <div className="space-y-3">
-                {traderStats.map((t) => <TraderSummary key={t.address} stats={t} />)}
+              <div>
+                {traderStats.map((t, i) => <TraderRow key={t.address} stats={t} idx={i} />)}
               </div>
             </div>
           </div>

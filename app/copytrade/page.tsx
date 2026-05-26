@@ -14,11 +14,7 @@ import {
   type TraderStats,
 } from "../hooks/useHyperliquid";
 
-// ─── The traders we follow ─────────────────────────────
-const FOLLOWED = [
-  "0x8def9f50456c6c4e37fa5d3d57f108ed23992dae",
-  "0x152e41f0b83e6cad4b5dc730c1d6279b7d67c9dc",
-];
+import { FOLLOWED_TRADERS as FOLLOWED } from "../lib/followed-traders";
 
 // ─── Helpers ───────────────────────────────────────────
 function fmtUSD(n: number, withSign = false, decimals = 0) {
@@ -111,81 +107,75 @@ function TraderCard({ stats, idx, loading }: { stats: TraderStats; idx: number; 
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: idx * 0.06, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className="relative rounded-2xl overflow-hidden bg-[#171717] text-white"
-      style={{ boxShadow: "0 12px 48px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.04)" }}
+      transition={{ delay: idx * 0.04, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      className="relative rounded-xl overflow-hidden bg-[#171717] text-white"
+      style={{ boxShadow: "0 8px 32px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.04)" }}
     >
-      {/* glow */}
       <motion.div
-        className="absolute -top-32 -right-32 w-[300px] h-[300px] rounded-full blur-2xl"
-        style={{ background: profitable ? "radial-gradient(circle, rgba(0,255,136,0.18), transparent 70%)" : "radial-gradient(circle, rgba(255,68,68,0.15), transparent 70%)" }}
-        animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute -top-20 -right-20 w-[180px] h-[180px] rounded-full blur-2xl pointer-events-none"
+        style={{ background: profitable ? "radial-gradient(circle, rgba(0,255,136,0.14), transparent 70%)" : "radial-gradient(circle, rgba(255,68,68,0.12), transparent 70%)" }}
+        animate={{ scale: [1, 1.12, 1] }} transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
       />
-      <div className="relative p-6">
+      <div className="relative p-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2.5">
-            <span className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center text-[12px] font-semibold number-mono text-white/70 ring-1 ring-white/[0.08]">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-white/[0.06] flex items-center justify-center text-[10px] font-semibold number-mono text-white/70 ring-1 ring-white/[0.08]">
               T{idx + 1}
             </span>
             <a
               href={hyperliquidExplorer(stats.address)}
               target="_blank" rel="noreferrer"
-              className="group inline-flex items-center gap-1.5 text-[13px] font-medium number-mono text-white/80 hover:text-white transition-colors"
+              className="group inline-flex items-center gap-1 text-[11.5px] font-medium number-mono text-white/80 hover:text-white transition-colors"
               title={stats.address}
             >
-              {truncateAddress(stats.address)}
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-50 group-hover:opacity-100 transition-opacity"><path d="M7 17L17 7M7 7h10v10" /></svg>
+              {truncateAddress(stats.address, 5, 4)}
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-40 group-hover:opacity-100 transition-opacity"><path d="M7 17L17 7M7 7h10v10" /></svg>
             </a>
           </div>
-          <div className="flex items-center gap-1.5">
-            <LivePulse color="#00ff88" size={6} />
-            <span className="text-[10px] uppercase tracking-[0.14em] text-white/40 font-medium">Live</span>
-          </div>
+          <LivePulse color="#00ff88" size={5} />
         </div>
 
         {/* Account Value */}
-        <div className="mb-5">
-          <p className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-medium mb-2">Account Value</p>
-          <Tape value={stats.accountValue} prefix="$" decimals={0} className="text-[36px] font-semibold tracking-tight text-white leading-none" />
+        <div className="mb-3">
+          <p className="text-[9.5px] uppercase tracking-[0.12em] text-white/35 font-medium mb-1">Account</p>
+          <Tape value={stats.accountValue} prefix="$" decimals={0} className="text-[24px] font-semibold tracking-tight text-white leading-none" />
         </div>
 
-        {/* PnL 24h */}
-        <div className="grid grid-cols-3 gap-4 mb-5">
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-3 mb-3 pt-3 border-t border-white/[0.06]">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-medium mb-1.5">24h PnL</p>
-            <p className={`number-mono text-[15px] font-semibold ${profitable ? "text-[#00ff88]" : "text-[#ff5566]"}`}>
+            <p className="text-[9.5px] uppercase tracking-[0.1em] text-white/35 font-medium mb-1">24h</p>
+            <p className={`number-mono text-[12.5px] font-semibold ${profitable ? "text-[#00ff88]" : "text-[#ff5566]"}`}>
               {profitable ? "+" : "−"}{fmtUSD(Math.abs(stats.pnl24h), false, 0)}
             </p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-medium mb-1.5">Win Rate</p>
-            <p className="number-mono text-[15px] font-semibold text-white">{(stats.winRate * 100).toFixed(0)}%</p>
+            <p className="text-[9.5px] uppercase tracking-[0.1em] text-white/35 font-medium mb-1">Win</p>
+            <p className="number-mono text-[12.5px] font-semibold text-white">{(stats.winRate * 100).toFixed(0)}%</p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-medium mb-1.5">Open</p>
-            <p className="number-mono text-[15px] font-semibold text-white">{stats.positions.length}</p>
+            <p className="text-[9.5px] uppercase tracking-[0.1em] text-white/35 font-medium mb-1">Open</p>
+            <p className="number-mono text-[12.5px] font-semibold text-white">{stats.positions.length}</p>
           </div>
         </div>
 
-        {/* Last action */}
-        <div className="pt-4 border-t border-white/[0.07]">
-          <p className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-medium mb-2">Last Action</p>
-          {last ? (
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className={`text-[10px] font-semibold uppercase tracking-[0.08em] px-1.5 py-0.5 rounded ${
-                  lastSide === "long" || lastSide === "buy" ? "text-[#00ff88] bg-[#00ff88]/10" : "text-[#ff5566] bg-[#ff5566]/10"
-                }`}>{last.dir}</span>
-                <span className="text-[13px] font-medium number-mono text-white">{last.coin}</span>
-                <span className="text-[12px] text-white/50 number-mono">@ ${fmtNum(parseFloat(last.px), 4)}</span>
-              </div>
-              <span className="text-[11px] text-white/40 number-mono shrink-0">{fmtTimeAgo(last.time)} ago</span>
+        {/* Last action — compact one-line */}
+        {last ? (
+          <div className="pt-3 border-t border-white/[0.06] flex items-center justify-between gap-2 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <span className={`text-[9px] font-semibold uppercase tracking-[0.06em] px-1 py-0.5 rounded shrink-0 ${
+                lastSide === "long" || lastSide === "buy" ? "text-[#00ff88] bg-[#00ff88]/10" : "text-[#ff5566] bg-[#ff5566]/10"
+              }`}>{last.dir.split(" ")[0]}</span>
+              <span className="text-[11.5px] font-medium number-mono text-white truncate">{last.coin}</span>
             </div>
-          ) : (
-            <p className="text-[12px] text-white/35">{loading ? "Loading…" : "No recent fills"}</p>
-          )}
-        </div>
+            <span className="text-[10px] text-white/40 number-mono shrink-0">{fmtTimeAgo(last.time)} ago</span>
+          </div>
+        ) : (
+          <div className="pt-3 border-t border-white/[0.06]">
+            <p className="text-[10.5px] text-white/35">{loading ? "Loading…" : "No recent fills"}</p>
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -389,7 +379,7 @@ export default function CopyTradePage() {
             <p className="eyebrow">Following</p>
             <span className="number-mono text-[11px] text-[#bbb]">· {stats.length} wallets</span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {stats.map((s, i) => (
               <TraderCard key={s.address} stats={s} idx={i} loading={loading} />
             ))}
