@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
+// Default to the deployed fly backend; override via BACKEND_URL env var (e.g. `http://localhost:4000` in dev).
 const backendUrl =
-  process.env.BACKEND_URL?.replace(/\/$/, "") || "http://localhost:4000";
+  process.env.BACKEND_URL?.replace(/\/$/, "") || "https://agentbank-api.fly.dev";
 
 const nextConfig: NextConfig = {
   async rewrites() {
